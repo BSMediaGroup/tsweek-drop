@@ -52,6 +52,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   .kicker{font-size:.72rem; letter-spacing:.12em; text-transform:uppercase; color:#8b97a6; margin-bottom:8px}
   h3{font-family:"Source Sans 3",sans-serif; font-weight:750; font-size:1.35rem; margin:0 0 6px; letter-spacing:-.3px}
   p{margin:0 0 16px; color:#8b97a6; font-size:.9rem}
+  .err{color:#ff6b63; font-size:.85rem; margin:-8px 0 12px}
   input{background:#0c1016; border:1px solid rgba(176,196,220,.16); color:#f4f7fb; padding:12px 14px; border-radius:10px; width:100%; font-family:inherit; font-size:1rem}
   input:focus{outline:none; border-color:#7eb0ff; box-shadow:0 0 0 3px rgba(126,176,255,.22)}
   button{background:linear-gradient(180deg,#9ec2ff,#4f86ee); color:#fff; border:1px solid rgba(190,214,255,.7); padding:12px 16px; border-radius:10px; margin-top:14px; width:100%; cursor:pointer; font-family:inherit; font-weight:650; box-shadow:inset 0 1px 0 rgba(255,255,255,.35), 0 8px 20px rgba(79,134,238,.28)}
@@ -61,6 +62,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     <div class="kicker">Daniel Clancy</div>
     <h3>Shared timesheet</h3>
     <p>This link is password protected.</p>
+    ${provided ? '<div class="err">Incorrect password.</div>' : ""}
     <input type="password" name="p" placeholder="Password" autofocus required>
     <button type="submit">View ledger</button>
   </form>
@@ -68,10 +70,40 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     }
   }
 
-  const data = JSON.parse(row.data);
+  let data: any;
+  try { data = JSON.parse(row.data); }
+  catch { return new Response("Share data is unreadable", { status: 500 }); }
   const weeks = data.weeks || [];
   const tilEntries = data.tilEntries || [];
-  const standard = data.standard || 38;
+  const standard = (data.standard == null || data.standard === "" || !isFinite(Number(data.standard)))
+    ? 38
+    : Math.max(0, Math.round(Number(data.standard) * 100) / 100);
+  const weekEndDay = Math.min(6, Math.max(0, Number(data.weekEndDay) || 0));
+
+  const readHours = (v: any) => {
+    if (v == null || v === "") return null;
+    const n = Number(v);
+    if (!isFinite(n) || n < 0) return null;
+    return Math.round((n + Number.EPSILON) * 100) / 100;
+  };
+  const readTil = (v: any) => {
+    const n = Number(v);
+    if (!isFinite(n) || n < 0) return 0;
+    return Math.round((n + Number.EPSILON) * 100) / 100;
+  };
+  const endingFor = (index: number) => {
+    const base = new Date(2026, 8, 25);
+    const dayOfBase = base.getDay();
+    const mondayOffset = dayOfBase === 0 ? -6 : 1 - dayOfBase;
+    const weekStart = new Date(base);
+    weekStart.setDate(base.getDate() + mondayOffset + index * 7);
+    const daysToAdd = weekEndDay === 0 ? 6 : weekEndDay - 1;
+    const target = new Date(weekStart);
+    target.setDate(weekStart.getDate() + daysToAdd);
+    const dd = String(target.getDate()).padStart(2, "0");
+    const mm = String(target.getMonth() + 1).padStart(2, "0");
+    return dd + "/" + mm + "/" + target.getFullYear();
+  };
 
   const formatClock = (v: any) => {
     if (v == null || v === "" || isNaN(Number(v))) return "";
@@ -92,19 +124,21 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 
   let total = 0, count = 0, net = 0;
   weeks.forEach((w: any) => {
-    if (w.hours != null && w.hours !== "") {
-      total += Number(w.hours);
-      count++;
-      net += Number(w.hours) - standard;
-    }
+    const h = readHours(w.hours);
+    if (h == null) return;
+    total += h;
+    count++;
+    net += h - standard;
   });
-  const tilTotal = tilEntries.reduce((s: number, t: any) => s + (Number(t.hours) || 0), 0);
-  const netAfter = net - tilTotal;
+  total = Math.round((total + Number.EPSILON) * 100) / 100;
+  net = Math.round((net + Number.EPSILON) * 100) / 100;
+  const tilTotal = Math.round((tilEntries.reduce((s: number, t: any) => s + readTil(t.hours), 0) + Number.EPSILON) * 100) / 100;
+  const netAfter = Math.round((net - tilTotal + Number.EPSILON) * 100) / 100;
   const avgNum = count ? total / count : null;
   const avg = avgNum != null ? avgNum.toFixed(2) : "—";
-  const netStr = (netAfter >= 0 ? "+" : "") + netAfter.toFixed(2);
+  const netStr = netAfter > 0 ? "+" + netAfter.toFixed(2) : netAfter.toFixed(2);
   const netClass = netAfter > 0.05 ? "positive" : netAfter < -0.05 ? "negative" : "neutral";
-  const grossStr = (net >= 0 ? "+" : "") + net.toFixed(2);
+  const grossStr = net > 0 ? "+" + net.toFixed(2) : net.toFixed(2);
 
   const esc = (s: any) => String(s ?? "")
     .split("&").join("&" + "amp;")
@@ -114,19 +148,26 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     .split("'").join("&" + "#39;");
   const avgPdf = avgNum != null ? avg + "hrs " + clockParen(avgNum) : "—";
 
-  const rows = weeks.map((w: any) => {
-    const hoursNum = w.hours != null && w.hours !== "" ? Number(w.hours) : null;
+  const safeHref = (url: any) => {
+    const s = String(url || "").trim();
+    return /^https?:\/\//i.test(s) ? esc(s) : "";
+  };
+
+  const rows = weeks.map((w: any, i: number) => {
+    const hoursNum = readHours(w.hours);
     const hrs = hoursNum != null ? hoursNum.toFixed(2) : "—";
     const hrsClock = hoursNum != null ? `<span class="unit">hrs</span> <span class="clock">${clockParen(hoursNum)}</span>` : "";
-    const variance = w.variance != null && w.variance !== "" ? Number(w.variance) : (hoursNum != null ? +(hoursNum - standard).toFixed(2) : null);
-    const vr = variance != null ? (variance >= 0 ? "+" : "") + variance.toFixed(2) : "—";
+    const variance = hoursNum != null ? Math.round((hoursNum - standard + Number.EPSILON) * 100) / 100 : null;
+    const vr = variance == null ? "—" : (variance > 0 ? "+" : "") + variance.toFixed(2);
     const vrClock = variance != null ? `<span class="unit">hrs</span> <span class="clock">${clockParen(variance, true)}</span>` : "";
-    const link = w.url ? `<a href="${esc(w.url)}" target="_blank" rel="noopener">Open</a>` : "—";
-    return `<tr><td>${esc(w.week || "")}</td><td>${esc(w.ending || "")}</td><td>${hrs} ${hrsClock}</td><td>${vr} ${vrClock}</td><td>${link}</td></tr>`;
+    const href = safeHref(w.url);
+    const ending = w.ending || endingFor(i);
+    const link = href ? `<a href="${href}" target="_blank" rel="noopener">Open</a>` : "—";
+    return `<tr><td>${esc(w.week || "")}</td><td>${esc(ending)}</td><td>${hrs} ${hrsClock}</td><td>${vr} ${vrClock}</td><td>${link}</td></tr>`;
   }).join("");
 
   const tilRows = tilEntries.map((t: any) => {
-    const h = Number(t.hours) || 0;
+    const h = readTil(t.hours);
     return `<tr><td>${esc(t.date || "—")}</td><td>${h.toFixed(2)} <span class="unit">hrs</span> <span class="clock">${clockParen(h)}</span></td><td>${esc(t.note || "")}</td></tr>`;
   }).join("");
 
@@ -340,10 +381,11 @@ function exportPDF() {
   doc.setTextColor(30, 30, 30);
   WEEKS.forEach(w => {
     if (y > 270) { doc.addPage(); y = 20; }
-    const hoursNum = w.hours != null && w.hours !== "" ? Number(w.hours) : null;
-    const variance = w.variance != null && w.variance !== "" ? Number(w.variance) : (hoursNum != null ? hoursNum - STANDARD : null);
+    const raw = w.hours;
+    const hoursNum = (raw == null || raw === "" || !isFinite(Number(raw)) || Number(raw) < 0) ? null : Math.round(Number(raw) * 100) / 100;
+    const variance = hoursNum == null ? null : Math.round((hoursNum - STANDARD) * 100) / 100;
     const hrs = hoursNum != null ? hoursNum.toFixed(2) + "hrs" : "—";
-    const vr = variance != null ? (variance >= 0 ? "+" : "") + variance.toFixed(2) + "hrs" : "—";
+    const vr = variance == null ? "—" : (variance > 0 ? "+" : "") + variance.toFixed(2) + "hrs";
     doc.text(String(w.week || ""), 16, y);
     doc.text(String(w.ending || ""), 42, y);
     doc.text(hrs, 72, y);
@@ -356,9 +398,9 @@ function exportPDF() {
       doc.setFontSize(9);
       doc.setTextColor(30, 30, 30);
     }
-    if (w.url) {
+    if (w.url && /^https?:\/\//i.test(String(w.url))) {
       doc.setTextColor(91, 156, 245);
-      doc.textWithLink("Open", 148, y, { url: w.url });
+      doc.textWithLink("Open", 148, y, { url: String(w.url) });
       doc.setTextColor(30, 30, 30);
     } else {
       doc.text("—", 148, y);
@@ -375,7 +417,8 @@ function exportPDF() {
     doc.setFontSize(9);
     TIL.forEach(function (t) {
       if (y > 275) { doc.addPage(); y = 20; }
-      var h = Number(t.hours) || 0;
+      var h = Number(t.hours);
+      if (!isFinite(h) || h < 0) h = 0;
       doc.setTextColor(30, 30, 30);
       doc.text((t.date || "—") + "    " + h.toFixed(2) + "hrs " + clockParen(h) + "    " + (t.note || ""), 14, y);
       y += 6;
