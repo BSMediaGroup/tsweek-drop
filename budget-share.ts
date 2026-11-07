@@ -152,21 +152,22 @@ const PAGE_CSS = `
   .section { border-radius: 14px; margin: 14px 0; overflow: hidden; }
   .section h3 { padding: 12px 14px 0; }
   .section .pad { padding: 12px 14px 14px; }
-  .charts { display: grid; grid-template-columns: 1.05fr .95fr; gap: 10px; }
-  .chart-card { border-radius: 14px; padding: 12px 14px 8px; overflow: visible; }
+  .charts { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .chart-card { border-radius: 14px; padding: 14px 16px 12px; overflow: hidden; transition: border-color .2s ease; }
   .chart-card.wide { grid-column: 1 / -1; }
-  .chart-card h3 { margin-bottom: 4px; }
-  .chart-stage { position: relative; height: 260px; perspective: 900px; }
-  .chart-stage.tall { height: 300px; }
-  .chart-stage canvas {
-    width: 100% !important; height: 100% !important;
-    transform: rotateX(10deg); transform-origin: center 70%;
-    filter: drop-shadow(0 16px 12px rgba(0,0,0,.5));
-    transition: transform .45s ease, filter .45s ease;
+  .chart-card h3 { margin-bottom: 8px; }
+  .chart-card:hover { border-color: rgba(196,214,236,.32); }
+  .chart-stage { position: relative; height: 250px; display: flex; align-items: center; justify-content: center; }
+  .chart-stage.bars, .chart-stage.tall { display: block; height: 260px; }
+  .chart-stage canvas,
+  .chart-stage.bars canvas,
+  .chart-card:hover canvas,
+  .chart-card:hover .chart-stage.bars canvas {
+    transform: none !important;
+    filter: none !important;
+    max-height: none !important;
   }
-  .chart-stage.bars canvas { transform: rotateX(14deg) rotateY(-8deg); }
-  .chart-card:hover canvas { transform: rotateX(3deg) scale(1.025); filter: drop-shadow(0 22px 16px rgba(90,140,220,.28)); }
-  .chart-card:hover .chart-stage.bars canvas { transform: rotateX(4deg) rotateY(-2deg) scale(1.03); filter: drop-shadow(0 22px 16px rgba(90,140,220,.32)); }
+  .chart-stage.bars canvas { width: 100% !important; height: 100% !important; }
   .table-wrap { overflow: auto; border-radius: 14px; border: 1px solid rgba(176,196,220,.14); background: linear-gradient(180deg, rgba(255,255,255,.04), transparent 30%), #121820; box-shadow: inset 0 1px 0 rgba(255,255,255,.05); }
   table { width: 100%; border-collapse: collapse; }
   th { background: #1a2230; text-align: left; padding: 8px 10px; font-size: .68rem; letter-spacing: .06em; text-transform: uppercase; color: #8b97a6; white-space: nowrap; }
@@ -227,48 +228,37 @@ const CHART_BOOT = `
     var r = clamp((num >> 16) + amt), g = clamp(((num >> 8) & 255) + amt), b = clamp((num & 255) + amt);
     return "#" + ((r << 16) | (g << 8) | b).toString(16).padStart(6, "0");
   }
-  var doughnutDepth = { id: "doughnutDepth", beforeDatasetsDraw: function (chart) {
-    var meta = chart.getDatasetMeta(0); var ctx = chart.ctx; var layers = 12;
-    for (var i = layers; i >= 1; i--) {
-      var t = i / layers;
-      meta.data.forEach(function (arc) {
-        var p = arc.getProps(["x", "y", "startAngle", "endAngle", "innerRadius", "outerRadius"], true);
-        ctx.save(); ctx.translate(5 * t, 12 * t); ctx.beginPath();
-        ctx.arc(p.x, p.y, p.outerRadius, p.startAngle, p.endAngle);
-        ctx.arc(p.x, p.y, Math.max(0, p.innerRadius - 0.5), p.endAngle, p.startAngle, true);
-        ctx.closePath();
-        var shade = Math.round(6 + (1 - t) * 22);
-        ctx.fillStyle = "rgba(" + shade + "," + (shade + 6) + "," + (shade + 14) + "," + (0.22 + t * 0.38) + ")";
-        ctx.fill(); ctx.restore();
-      });
-    }
-  }};
-  var barDepth = { id: "barDepth", beforeDatasetsDraw: function (chart) {
-    if (chart.options.indexAxis === "y") return;
+  var valueLabels = { id: "valueLabels", afterDatasetsDraw: function (chart) {
     var ctx = chart.ctx;
-    chart.data.datasets.forEach(function (_ds, di) {
-      var meta = chart.getDatasetMeta(di);
-      if (!meta || meta.hidden) return;
-      meta.data.forEach(function (bar) {
-        var p = bar.getProps(["x", "y", "base", "width"], true);
-        if (p.width == null || p.base == null) return;
-        var top = Math.min(p.y, p.base), bot = Math.max(p.y, p.base), d = 8;
-        ctx.save();
-        ctx.beginPath();
-        ctx.moveTo(p.x - p.width / 2, top);
-        ctx.lineTo(p.x - p.width / 2 + d, top - d);
-        ctx.lineTo(p.x + p.width / 2 + d, top - d);
-        ctx.lineTo(p.x + p.width / 2, top);
-        ctx.closePath(); ctx.fillStyle = "rgba(255,255,255,0.16)"; ctx.fill();
-        ctx.beginPath();
-        ctx.moveTo(p.x + p.width / 2, top);
-        ctx.lineTo(p.x + p.width / 2 + d, top - d);
-        ctx.lineTo(p.x + p.width / 2 + d, bot - 1);
-        ctx.lineTo(p.x + p.width / 2, bot);
-        ctx.closePath(); ctx.fillStyle = "rgba(0,0,0,0.38)"; ctx.fill();
-        ctx.restore();
-      });
+    var meta = chart.getDatasetMeta(0);
+    if (!meta || meta.hidden) return;
+    var horizontal = chart.options.indexAxis === "y";
+    ctx.save();
+    ctx.fillStyle = "#d5deea";
+    ctx.font = "600 11px Blinker, sans-serif";
+    meta.data.forEach(function (el, i) {
+      var raw = Number(chart.data.datasets[0].data[i]);
+      if (!isFinite(raw)) return;
+      var label = "$" + Math.round(raw).toLocaleString();
+      var p = el.getProps(["x", "y", "base"], true);
+      if (horizontal) { ctx.textAlign = "left"; ctx.textBaseline = "middle"; ctx.fillText(label, p.x + 8, p.y); }
+      else { ctx.textAlign = "center"; ctx.textBaseline = "bottom"; ctx.fillText(label, p.x, Math.min(p.y, p.base) - 6); }
     });
+    ctx.restore();
+  }};
+  var barTrack = { id: "barTrack", beforeDatasetsDraw: function (chart) {
+    if (chart.options.indexAxis !== "y") return;
+    var ctx = chart.ctx, area = chart.chartArea, meta = chart.getDatasetMeta(0);
+    if (!meta || !area) return;
+    ctx.save();
+    meta.data.forEach(function (bar) {
+      var p = bar.getProps(["y"], true);
+      ctx.fillStyle = "rgba(255,255,255,0.045)";
+      ctx.beginPath();
+      ctx.roundRect(area.left, p.y - 5, area.right - area.left, 10, 6);
+      ctx.fill();
+    });
+    ctx.restore();
   }};
   function verticalGradient(chart, hex) {
     var area = chart.chartArea; if (!area) return hex;
@@ -282,38 +272,41 @@ const CHART_BOOT = `
     g.addColorStop(0, shadeHex(hex, -36)); g.addColorStop(1, shadeHex(hex, 18));
     return g;
   }
-  var anim = { duration: 1400, easing: "easeOutQuart", delay: function (ctx) { return ctx.type === "data" ? ctx.dataIndex * 80 : 0; } };
+  var anim = { duration: 700, easing: "easeOutCubic", delay: function (ctx) { return ctx.type === "data" ? ctx.dataIndex * 40 : 0; } };
   var tip = { backgroundColor: "rgba(10,14,20,.94)", borderColor: "rgba(186,206,230,.22)", borderWidth: 1, padding: 10, cornerRadius: 10, titleColor: "#f4f7fb", bodyColor: "#c5ced8", titleFont: { family: "Blinker", size: 12, weight: "600" }, bodyFont: { family: "Blinker", size: 12 } };
   var legend = { position: "bottom", labels: { color: "#c5ced8", boxWidth: 10, padding: 10, font: { size: 11, family: "Blinker" } } };
   var scales = { x: { ticks: { color: "#8b97a6", font: { size: 11, family: "Blinker" } }, grid: { display: false } }, y: { ticks: { color: "#8b97a6", font: { size: 10 } }, grid: { color: "rgba(176,196,220,0.08)" }, border: { display: false } } };
   if (document.getElementById("pieChart")) {
     new Chart(document.getElementById("pieChart"), {
       type: "doughnut",
-      data: { labels: DATA.pieLabels, datasets: [{ data: DATA.pieValues, backgroundColor: palette, hoverBackgroundColor: palette.map(function (c) { return shadeHex(c, 28); }), borderColor: "#0c1016", borderWidth: 3, spacing: 3, borderRadius: 7, hoverOffset: 18 }] },
-      plugins: [doughnutDepth, { id: "pieCenter", afterDraw: function (chart) {
+      data: { labels: DATA.pieLabels, datasets: [{ data: DATA.pieValues, backgroundColor: palette, hoverBackgroundColor: palette.map(function (c) { return shadeHex(c, 22); }), borderColor: "#121820", borderWidth: 2, spacing: 2, borderRadius: 4, hoverOffset: 6 }] },
+      plugins: [{ id: "pieCenter", afterDraw: function (chart) {
         var meta = chart.getDatasetMeta(0); if (!meta.data[0]) return;
         var x = meta.data[0].x, y = meta.data[0].y, ctx = chart.ctx;
         ctx.save(); ctx.textAlign = "center"; ctx.fillStyle = "#f4f7fb";
-        ctx.font = "700 15px Source Sans 3, sans-serif";
+        ctx.font = "700 16px Source Sans 3, sans-serif";
         ctx.fillText("$" + Math.round(DATA.totalMonth || 0).toLocaleString(), x, y - 2);
         ctx.fillStyle = "#8b97a6"; ctx.font = "600 10px Blinker, sans-serif"; ctx.fillText("PER MONTH", x, y + 14); ctx.restore();
       }}],
-      options: { cutout: "66%", animation: anim, maintainAspectRatio: false, layout: { padding: { top: 14, right: 18, bottom: 4, left: 8 } }, plugins: { legend: legend, tooltip: Object.assign({}, tip, { callbacks: { label: function (c) { return " " + c.label + "  $" + Number(c.raw).toFixed(2); } } }) } }
+      options: { cutout: "68%", animation: anim, plugins: { legend: legend, tooltip: Object.assign({}, tip, { callbacks: { label: function (c) { return " " + c.label + "  $" + Number(c.raw).toFixed(2); } } }) } }
     });
   }
   if (document.getElementById("barChart")) {
     new Chart(document.getElementById("barChart"), {
       type: "bar",
-      data: { labels: DATA.barLabels, datasets: [{ data: DATA.barValues, borderRadius: 10, borderSkipped: false, barPercentage: 0.62, backgroundColor: function (c) { return verticalGradient(c.chart, DATA.barColors[c.dataIndex]); }, hoverBackgroundColor: (DATA.barColors || []).map(function (c) { return shadeHex(c, 24); }) }] },
-      plugins: [barDepth],
-      options: { animation: anim, maintainAspectRatio: false, layout: { padding: { top: 16, right: 18, bottom: 0, left: 0 } }, plugins: { legend: { display: false }, tooltip: Object.assign({}, tip, { callbacks: { label: function (c) { return " $" + Number(c.raw).toFixed(2); } } }) }, scales: scales }
+      data: { labels: DATA.barLabels, datasets: [{ data: DATA.barValues, borderRadius: 6, borderSkipped: false, barPercentage: 0.55, backgroundColor: function (c) { return verticalGradient(c.chart, DATA.barColors[c.dataIndex]); }, hoverBackgroundColor: (DATA.barColors || []).map(function (c) { return shadeHex(c, 28); }) }] },
+      plugins: [valueLabels],
+      options: { animation: anim, maintainAspectRatio: false, layout: { padding: { top: 18, right: 4, bottom: 0, left: 0 } }, plugins: { legend: { display: false }, tooltip: Object.assign({}, tip, { callbacks: { label: function (c) { return " $" + Number(c.raw).toFixed(2); } } }) }, scales: scales }
     });
   }
   if (document.getElementById("catChart") && DATA.catLabels && DATA.catLabels.length) {
+    var catStage = document.getElementById("catChart").parentElement;
+    if (catStage) catStage.style.height = Math.max(160, DATA.catLabels.length * 38 + 28) + "px";
     new Chart(document.getElementById("catChart"), {
       type: "bar",
-      data: { labels: DATA.catLabels, datasets: [{ data: DATA.catValues, borderRadius: 8, borderSkipped: false, barPercentage: 0.72, backgroundColor: function (c) { return horizontalGradient(c.chart, palette[c.dataIndex % palette.length]); }, hoverBackgroundColor: DATA.catLabels.map(function (_k, i) { return shadeHex(palette[i % palette.length], 28); }) }] },
-      options: { indexAxis: "y", animation: anim, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: Object.assign({}, tip, { callbacks: { label: function (c) { return " $" + Number(c.raw).toFixed(2) + " / mo"; } } }) }, scales: { x: scales.x, y: { ticks: { color: "#c5ced8", font: { size: 11, family: "Blinker" } }, grid: { display: false } } } }
+      data: { labels: DATA.catLabels, datasets: [{ data: DATA.catValues, borderRadius: 6, borderSkipped: false, barPercentage: 0.55, backgroundColor: function (c) { return horizontalGradient(c.chart, palette[c.dataIndex % palette.length]); }, hoverBackgroundColor: DATA.catLabels.map(function (_k, i) { return shadeHex(palette[i % palette.length], 26); }) }] },
+      plugins: [barTrack, valueLabels],
+      options: { indexAxis: "y", animation: anim, maintainAspectRatio: false, layout: { padding: { right: 72 } }, plugins: { legend: { display: false }, tooltip: Object.assign({}, tip, { callbacks: { label: function (c) { return " $" + Number(c.raw).toFixed(2) + " / mo"; } } }) }, scales: { x: scales.x, y: { ticks: { color: "#c5ced8", font: { size: 12, family: "Blinker" } }, grid: { display: false } } } }
     });
   }
   if (document.getElementById("histChart") && DATA.history && DATA.history.length > 1) {
@@ -326,8 +319,8 @@ const CHART_BOOT = `
           { label: "Expenses", data: DATA.history.map(function (h) { return h.expenses; }), borderRadius: 8, barPercentage: 0.7, backgroundColor: function (c) { return verticalGradient(c.chart, "#ff6b63"); } }
         ]
       },
-      plugins: [barDepth],
-      options: { animation: anim, maintainAspectRatio: false, layout: { padding: { top: 16, right: 12, bottom: 0, left: 0 } }, plugins: { legend: legend, tooltip: tip }, scales: scales }
+      plugins: [],
+      options: { animation: anim, maintainAspectRatio: false, layout: { padding: { top: 18 } }, plugins: { legend: legend, tooltip: tip }, scales: scales }
     });
   }
 })();

@@ -522,22 +522,28 @@
   }
   .modal { border-radius: 18px; animation: modal-in .2s ease; }
   @keyframes modal-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
-  .charts { grid-template-columns: 1.05fr .95fr; gap: 10px; }
-  .chart-card { border-radius: 14px; padding: 12px 14px 8px; }
+  .charts { grid-template-columns: 1fr 1fr; gap: 12px; align-items: stretch; }
+  .chart-card { border-radius: 14px; padding: 14px 16px 12px; overflow: hidden; transition: border-color .2s ease; }
   .chart-card.wide { grid-column: 1 / -1; }
-  .chart-card h3 { letter-spacing: .08em; margin-bottom: 4px; }
-  .chart-stage { position: relative; min-height: 230px; perspective: 900px; }
-  .chart-stage canvas {
-    max-height: 250px !important;
-    transform: rotateX(12deg);
-    transform-origin: center 72%;
-    filter: drop-shadow(0 16px 12px rgba(0,0,0,.5));
-    transition: transform .45s ease, filter .45s ease;
+  .chart-card h3 { letter-spacing: .08em; margin-bottom: 8px; }
+  .chart-card:hover { border-color: rgba(196,214,236,.32); }
+  .chart-stage {
+    position: relative;
+    height: 250px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
-  .chart-card:hover canvas {
-    transform: rotateX(3deg) scale(1.025);
-    filter: drop-shadow(0 22px 16px rgba(90,140,220,.28));
+  .chart-stage.bars { display: block; }
+  .chart-stage canvas,
+  .chart-stage.bars canvas,
+  .chart-card:hover canvas,
+  .chart-card:hover .chart-stage.bars canvas {
+    max-height: none !important;
+    transform: none !important;
+    filter: none !important;
   }
+  .chart-stage.bars canvas { width: 100% !important; height: 100% !important; }
   .insight-cards { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }
   .insight-card {
     border-radius: 12px; padding: 12px;
@@ -563,22 +569,7 @@
     border-color: rgba(190,214,255,.65) !important;
     box-shadow: inset 0 1px 0 rgba(255,255,255,.35), 0 8px 18px rgba(79,134,238,.28);
   }
-  .chart-card { overflow: visible; }
-  #chartsSection:not(.collapsed),
-  #chartsSection:not(.collapsed) .collapsible-body { overflow: visible; }
-  .chart-stage { padding: 4px 6px 18px; }
-  .chart-stage::after {
-    content: "";
-    position: absolute; left: 16%; right: 16%; bottom: 4px; height: 22px;
-    background: radial-gradient(ellipse at center, rgba(0,0,0,.55), transparent 70%);
-    pointer-events: none;
-  }
-  .chart-stage canvas { position: relative; z-index: 1; }
-  .chart-stage.bars canvas { transform: rotateX(14deg) rotateY(-8deg); }
-  .chart-card:hover .chart-stage.bars canvas {
-    transform: rotateX(4deg) rotateY(-2deg) scale(1.03);
-    filter: drop-shadow(0 22px 16px rgba(90,140,220,.32));
-  }
+  .chart-card { overflow: hidden; }
   .modal-header h2 { font-family: "Source Sans 3", sans-serif; font-size: 1.02rem; font-weight: 750; letter-spacing: -.2px; }
   .modal-header { background: linear-gradient(180deg, rgba(255,255,255,.05), transparent); }
   .insight-card .insight-copy { min-width: 0; }
@@ -1537,67 +1528,52 @@ function shadeHex(hex, amt) {
   const r = clamp((num >> 16) + amt), g = clamp(((num >> 8) & 255) + amt), b = clamp((num & 255) + amt);
   return "#" + ((r << 16) | (g << 8) | b).toString(16).padStart(6, "0");
 }
-const doughnutDepth = {
-  id: "doughnutDepth",
-  beforeDatasetsDraw(chart) {
+const valueLabels = {
+  id: "valueLabels",
+  afterDatasetsDraw(chart) {
+    const { ctx } = chart;
     const meta = chart.getDatasetMeta(0);
-    const ctx = chart.ctx;
-    const layers = 12;
-    for (let i = layers; i >= 1; i--) {
-      const t = i / layers;
-      meta.data.forEach(arc => {
-        const p = arc.getProps(["x", "y", "startAngle", "endAngle", "innerRadius", "outerRadius"], true);
-        ctx.save();
-        ctx.translate(5 * t, 12 * t);
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.outerRadius, p.startAngle, p.endAngle);
-        ctx.arc(p.x, p.y, Math.max(0, p.innerRadius - 0.5), p.endAngle, p.startAngle, true);
-        ctx.closePath();
-        const shade = Math.round(6 + (1 - t) * 22);
-        ctx.fillStyle = "rgba(" + shade + "," + (shade + 6) + "," + (shade + 14) + "," + (0.22 + t * 0.38) + ")";
-        ctx.fill();
-        ctx.restore();
-      });
-    }
+    if (!meta || meta.hidden) return;
+    const horizontal = chart.options.indexAxis === "y";
+    ctx.save();
+    ctx.fillStyle = "#d5deea";
+    ctx.font = "600 11px Blinker, sans-serif";
+    meta.data.forEach((el, i) => {
+      const raw = Number(chart.data.datasets[0].data[i]);
+      if (!isFinite(raw)) return;
+      const label = "$" + Math.round(raw).toLocaleString();
+      const p = el.getProps(["x", "y", "base"], true);
+      if (horizontal) {
+        ctx.textAlign = "left";
+        ctx.textBaseline = "middle";
+        ctx.fillText(label, p.x + 8, p.y);
+      } else {
+        ctx.textAlign = "center";
+        ctx.textBaseline = "bottom";
+        ctx.fillText(label, p.x, Math.min(p.y, p.base) - 6);
+      }
+    });
+    ctx.restore();
   }
 };
-const barDepth = {
-  id: "barDepth",
+const barTrack = {
+  id: "barTrack",
   beforeDatasetsDraw(chart) {
-    if (chart.options.indexAxis === "y") return;
+    if (chart.options.indexAxis !== "y") return;
+    const { ctx, chartArea } = chart;
     const meta = chart.getDatasetMeta(0);
-    const ctx = chart.ctx;
-    meta.data.forEach(bar => {
-      const p = bar.getProps(["x", "y", "base", "width"], true);
-      if (p.width == null || p.base == null) return;
-      const top = Math.min(p.y, p.base);
-      const bot = Math.max(p.y, p.base);
-      const d = 8;
-      ctx.save();
+    const yScale = chart.scales.y;
+    if (!meta || !chartArea || !yScale) return;
+    ctx.save();
+    meta.data.forEach((bar, i) => {
+      const p = bar.getProps(["y"], true);
+      const h = 10;
+      ctx.fillStyle = "rgba(255,255,255,0.045)";
       ctx.beginPath();
-      ctx.moveTo(p.x - p.width / 2, top);
-      ctx.lineTo(p.x - p.width / 2 + d, top - d);
-      ctx.lineTo(p.x + p.width / 2 + d, top - d);
-      ctx.lineTo(p.x + p.width / 2, top);
-      ctx.closePath();
-      const cap = ctx.createLinearGradient(0, top - d, 0, top);
-      cap.addColorStop(0, "rgba(255,255,255,0.34)");
-      cap.addColorStop(1, "rgba(255,255,255,0.05)");
-      ctx.fillStyle = cap;
+      ctx.roundRect(chartArea.left, p.y - h / 2, chartArea.right - chartArea.left, h, 6);
       ctx.fill();
-      ctx.beginPath();
-      ctx.moveTo(p.x + p.width / 2, top);
-      ctx.lineTo(p.x + p.width / 2 + d, top - d);
-      ctx.lineTo(p.x + p.width / 2 + d, bot - 1);
-      ctx.lineTo(p.x + p.width / 2, bot);
-      ctx.closePath();
-      const side = ctx.createLinearGradient(p.x, 0, p.x + d, 0);
-      side.addColorStop(0, "rgba(0,0,0,0.18)");
-      side.addColorStop(1, "rgba(0,0,0,0.42)");
-      ctx.fillStyle = side;
-      ctx.fill();
-      ctx.restore();
     });
+    ctx.restore();
   }
 };
 function verticalGradient(chart, hex) {
@@ -1653,7 +1629,7 @@ function updateCharts(expenses, income, savings, leftover) {
   const sig = JSON.stringify([pieValues.map(v => +v.toFixed(2)), barValues.map(v => +v.toFixed(2)), catEntries.map(([k, v]) => [k, +v.toFixed(2)])]);
   const animate = sig !== lastChartSig;
   lastChartSig = sig;
-  const anim = animate ? { duration: 1400, easing: "easeOutQuart", delay: (ctx) => ctx.type === "data" ? ctx.dataIndex * 80 : 0 } : false;
+  const anim = animate ? { duration: 700, easing: "easeOutCubic", delay: (ctx) => ctx.type === "data" ? ctx.dataIndex * 40 : 0 } : false;
   const legend = { position: "bottom", labels: { color: "#c5ced8", boxWidth: 10, padding: 10, font: { size: 11, family: "Blinker" } } };
   const totalMonth = pieValues.reduce((s, v) => s + v, 0);
 
@@ -1661,10 +1637,13 @@ function updateCharts(expenses, income, savings, leftover) {
   if (barChart) barChart.destroy();
   if (catChart) catChart.destroy();
 
+  const catStage = document.getElementById("catChart").parentElement;
+  if (catStage) catStage.style.height = Math.max(160, catEntries.length * 38 + 28) + "px";
+
   pieChart = new Chart(document.getElementById("pieChart"), {
     type: "doughnut",
-    data: { labels: pieLabels, datasets: [{ data: pieValues, backgroundColor: palette, hoverBackgroundColor: palette.map(c => shadeHex(c, 28)), borderColor: "#0c1016", borderWidth: 3, spacing: 3, borderRadius: 7, hoverOffset: 18 }] },
-    plugins: [doughnutDepth, {
+    data: { labels: pieLabels, datasets: [{ data: pieValues, backgroundColor: palette, hoverBackgroundColor: palette.map(c => shadeHex(c, 22)), borderColor: "#121820", borderWidth: 2, spacing: 2, borderRadius: 4, hoverOffset: 6 }] },
+    plugins: [{
       id: "pieCenter",
       afterDraw(chart) {
         const meta = chart.getDatasetMeta(0);
@@ -1674,7 +1653,7 @@ function updateCharts(expenses, income, savings, leftover) {
         ctx.save();
         ctx.textAlign = "center";
         ctx.fillStyle = "#f4f7fb";
-        ctx.font = "700 15px 'Source Sans 3', sans-serif";
+        ctx.font = "700 16px 'Source Sans 3', sans-serif";
         ctx.fillText("$" + Math.round(totalMonth).toLocaleString(), x, y - 2);
         ctx.fillStyle = "#8b97a6";
         ctx.font = "600 10px Blinker, sans-serif";
@@ -1683,9 +1662,8 @@ function updateCharts(expenses, income, savings, leftover) {
       }
     }],
     options: {
-      cutout: "66%",
+      cutout: "68%",
       animation: anim,
-      layout: { padding: { top: 14, right: 18, bottom: 4, left: 8 } },
       plugins: { legend, tooltip: Object.assign({}, chartTip, { callbacks: { label: (c) => " " + c.label + "  $" + Number(c.raw).toFixed(2) } }) }
     }
   });
@@ -1696,17 +1674,18 @@ function updateCharts(expenses, income, savings, leftover) {
       labels: barLabels,
       datasets: [{
         data: barValues,
-        borderRadius: 10,
+        borderRadius: 6,
         borderSkipped: false,
-        barPercentage: 0.62,
+        barPercentage: 0.55,
         backgroundColor: (c) => verticalGradient(c.chart, barColors[c.dataIndex]),
-        hoverBackgroundColor: barColors.map(c => shadeHex(c, 24))
+        hoverBackgroundColor: barColors.map(c => shadeHex(c, 28))
       }]
     },
-    plugins: [barDepth],
+    plugins: [valueLabels],
     options: {
       animation: anim,
-      layout: { padding: { top: 16, right: 18, bottom: 0, left: 0 } },
+      maintainAspectRatio: false,
+      layout: { padding: { top: 18, right: 4, bottom: 0, left: 0 } },
       plugins: { legend: { display: false }, tooltip: Object.assign({}, chartTip, { callbacks: { label: (c) => " $" + Number(c.raw).toFixed(2) } }) },
       scales: {
         x: { ticks: { color: "#8b97a6", font: { size: 11, family: "Blinker" } }, grid: { display: false } },
@@ -1721,22 +1700,25 @@ function updateCharts(expenses, income, savings, leftover) {
       labels: catEntries.map(([k]) => k),
       datasets: [{
         data: catEntries.map(([, v]) => v),
-        borderRadius: 8,
+        borderRadius: 6,
         borderSkipped: false,
-        barPercentage: 0.72,
+        barPercentage: 0.55,
         backgroundColor: (c) => horizontalGradient(c.chart, palette[c.dataIndex % palette.length]),
-        hoverBackgroundColor: catEntries.map((_, i) => shadeHex(palette[i % palette.length], 28))
+        hoverBackgroundColor: catEntries.map((_, i) => shadeHex(palette[i % palette.length], 26))
       }]
     },
     options: {
       indexAxis: "y",
       animation: anim,
+      maintainAspectRatio: false,
+      layout: { padding: { top: 4, right: 72, bottom: 0, left: 0 } },
       plugins: { legend: { display: false }, tooltip: Object.assign({}, chartTip, { callbacks: { label: (c) => " $" + Number(c.raw).toFixed(2) + " / mo" } }) },
       scales: {
         x: { ticks: { color: "#8b97a6", font: { size: 10 } }, grid: { color: "rgba(176,196,220,0.08)" }, border: { display: false } },
-        y: { ticks: { color: "#c5ced8", font: { size: 11, family: "Blinker" } }, grid: { display: false } }
+        y: { ticks: { color: "#c5ced8", font: { size: 12, family: "Blinker" } }, grid: { display: false } }
       }
-    }
+    },
+    plugins: [barTrack, valueLabels]
   });
 }
 
