@@ -158,22 +158,22 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   }
   .container{max-width:1100px;margin:0 auto}
   header{
-    margin:16px 0 20px; padding:18px 24px; display:flex; align-items:center; gap:14px;
-    border-radius:18px; border:1px solid rgba(186,206,230,.16);
+    margin:10px 0 12px; padding:8px 14px; display:flex; align-items:center; gap:12px;
+    border-radius:14px; border:1px solid rgba(186,206,230,.16);
     background:linear-gradient(180deg, rgba(255,255,255,.055), rgba(255,255,255,.015)), rgba(14,18,26,.78);
     box-shadow:inset 0 1px 0 rgba(255,255,255,.07), 0 18px 48px rgba(0,0,0,.42);
     backdrop-filter:blur(22px);
   }
   .logo-mark{
-    width:52px; height:52px; border-radius:16px; flex:none;
+    width:46px; height:46px; border-radius:12px; flex:none;
     display:flex; align-items:center; justify-content:center;
     background:radial-gradient(circle at 30% 20%, rgba(126,176,255,.28), rgba(126,176,255,.04) 70%);
     box-shadow:0 0 0 1px rgba(126,176,255,.22), 0 10px 24px rgba(0,0,0,.35);
   }
-  .logo-mark img{width:52px; height:52px; object-fit:contain}
-  .identity h1{font-family:"Source Sans 3",sans-serif; font-size:1.4rem; font-weight:800; margin:0; line-height:1.1; letter-spacing:-.3px}
-  .identity .role{color:var(--accent); font-size:.9rem}
-  .identity .company{color:var(--muted); font-size:.8rem}
+  .logo-mark img{width:46px; height:46px; object-fit:contain}
+  .identity h1{font-family:"Source Sans 3",sans-serif; font-size:1.22rem; font-weight:800; margin:0; line-height:1.05; letter-spacing:-.3px}
+  .identity .role{color:var(--accent); font-size:.8rem}
+  .identity .company{color:var(--muted); font-size:.74rem}
   .badge{
     margin-left:auto; font-size:.72rem; letter-spacing:.08em; text-transform:uppercase; color:#c5ced8;
     border:1px solid var(--border); border-radius:999px; padding:6px 10px;
@@ -186,15 +186,12 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   }
   .page-title::before{content:""; width:3px; height:16px; border-radius:3px; background:linear-gradient(180deg,#c5d9ff,#5b8def)}
   .summary{display:grid; grid-template-columns:repeat(5,1fr); gap:10px; margin-bottom:18px}
-  .stat{
-    position:relative; overflow:hidden; border-radius:14px; padding:13px 16px;
-    border:1px solid var(--border);
+  .stat{position:relative; overflow:hidden; border-radius:12px; padding:8px 12px; border:1px solid var(--border);
     background:linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.012) 42%, transparent), #121820;
-    box-shadow:inset 0 1px 0 rgba(255,255,255,.05), 0 12px 28px rgba(0,0,0,.22);
-  }
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.05), 0 12px 28px rgba(0,0,0,.22)}
   .stat::before{content:""; position:absolute; left:12px; right:12px; top:0; height:1px; background:linear-gradient(90deg, transparent, rgba(158,190,240,.85), transparent)}
   .stat .label{font-size:.7rem; color:var(--muted); text-transform:uppercase; letter-spacing:.08em; font-weight:600}
-  .stat .value{font-family:"Source Sans 3",sans-serif; font-size:1.28rem; font-weight:700; margin-top:3px}
+  .stat .value{font-family:"Source Sans 3",sans-serif; font-size:1.12rem; font-weight:700; margin-top:1px}
   .stat .value.positive{color:var(--green)}
   .stat .value.negative{color:var(--red)}
   .stat .value.neutral{color:#c5ced8}
@@ -222,11 +219,8 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     box-shadow:inset 0 1px 0 rgba(255,255,255,.05), 0 16px 40px rgba(0,0,0,.28);
   }
   table{width:100%; border-collapse:collapse}
-  th{
-    background:linear-gradient(180deg,#1c2532,#151c26); text-align:left; padding:13px 16px;
-    font-size:.7rem; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); font-weight:650;
-  }
-  td{padding:11px 16px; border-bottom:1px solid rgba(176,196,220,.08)}
+  th{background:linear-gradient(180deg,#1c2532,#151c26); text-align:left; padding:8px 12px; font-size:.7rem; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); font-weight:650}
+  td{padding:7px 12px; border-bottom:1px solid rgba(176,196,220,.08)}
   tbody tr:hover td{background:rgba(126,176,255,.07)}
   tr:last-child td{border-bottom:none}
   a{color:var(--accent); text-decoration:none; font-weight:600}
