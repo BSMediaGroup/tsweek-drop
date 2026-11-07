@@ -1,0 +1,2685 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Budget — Daniel Clancy</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Blinker:wght@300;400;500;600;700&family=Source+Sans+3:wght@400;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #07090d;
+    --bg-card: #12161c;
+    --bg-elevated: #1a1f26;
+    --border: #2a3038;
+    --text: #f0f3f6;
+    --text-secondary: #b0b8c4;
+    --text-muted: #7d8590;
+    --accent: #5b9cf5;
+    --accent-glow: rgba(91,156,245,0.25);
+    --green: #3fb950;
+    --red: #f85149;
+    --orange: #d29922;
+    --purple: #a371f7;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Blinker", "Segoe UI", sans-serif;
+    font-weight: 400;
+    min-height: 100vh;
+    padding: 24px 16px;
+  }
+  .container { max-width: 1280px; margin: 0 auto; }
+  h1, h2, .stat .value, .page-title {
+    font-family: "Source Sans 3", "Segoe UI", sans-serif;
+  }
+  header {
+    position: sticky;
+    top: 12px;
+    z-index: 200;
+    background: rgba(16, 21, 28, 0.96);
+    backdrop-filter: blur(16px);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 18px 24px;
+    margin: 0 0 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: relative;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  }
+  header.slim {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    width: 100%;
+    margin: 0;
+    padding: 10px 24px;
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+    z-index: 300;
+  }
+  header.slim .logo { width: 36px; height: 36px; }
+  header.slim .identity h1 { font-size: 1.05rem; }
+  header.slim .identity .role { font-size: 0.75rem; }
+  .brand { display: flex; align-items: center; gap: 14px; }
+  .logo {
+    width: 48px; height: 48px;
+    border-radius: 10px;
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+  .logo img { width: 100%; height: 100%; object-fit: cover; }
+  .identity h1 { font-size: 1.4rem; font-weight: 800; margin: 0; line-height: 1.1; }
+  .identity .role { color: var(--accent); font-size: 0.9rem; }
+  .identity .company { color: var(--text-muted); font-size: 0.8rem; }
+  .title-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin: 0 0 8px;
+  }
+  .page-title {
+    font-size: 1.15rem; font-weight: 700; letter-spacing: 0.04em;
+    text-transform: uppercase; color: var(--text-secondary); margin: 0;
+  }
+  .sync-status { font-size: 0.8rem; color: var(--text-muted); }
+  .actions { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; justify-content: space-between; }
+  .btn, button {
+    font-family: "Blinker", sans-serif;
+    background: var(--bg-card); border: 1px solid var(--border); color: var(--text-secondary);
+    padding: 8px 14px; border-radius: 8px; font-size: 0.85rem; font-weight: 500;
+    cursor: pointer; transition: all 0.15s; display: inline-flex; align-items: center; gap: 6px;
+  }
+  .btn:hover { background: var(--bg-elevated); color: var(--text); }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn.small { padding: 6px 12px; font-size: 0.8rem; }
+  .summary {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px;
+  }
+  .stat {
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: 12px; padding: 14px 16px;
+  }
+  .stat .label { font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+  .stat .value { font-size: 1.5rem; font-weight: 650; margin-top: 4px; }
+  .stat .value.green { color: var(--green); }
+  .stat .value.red { color: var(--red); }
+  .income-row {
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: 12px; padding: 16px 20px; margin-bottom: 20px;
+    display: flex; align-items: center; gap: 20px; flex-wrap: wrap;
+  }
+  .income-row label { font-size: 0.85rem; color: var(--text-secondary); }
+  .income-row input {
+    background: #0d1117; border: 1px solid var(--border); border-radius: 8px;
+    color: var(--text); padding: 8px 12px; font-size: 1.1rem; width: 140px; font-family: inherit;
+  }
+  .income-row input:focus { outline: none; border-color: var(--accent); }
+  .section {
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: 14px; margin-bottom: 16px; overflow: hidden;
+  }
+  .section-header {
+    background: var(--bg-elevated); padding: 12px 16px;
+    display: flex; justify-content: space-between; align-items: center;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+  }
+  .section-header:hover { background: #1e242c; }
+  .section-header h3 { font-size: 0.9rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-secondary); }
+  .section-body { padding: 8px 0; }
+  .expense-row {
+    display: grid;
+    grid-template-columns: 36px 1fr 28px 100px 90px 80px 80px 80px 80px 40px;
+    gap: 8px; align-items: center;
+    padding: 8px 16px; border-bottom: 1px solid var(--border);
+  }
+  .expense-row:last-child { border-bottom: none; }
+  .expense-row input, .expense-row select {
+    background: #0d1117; border: 1px solid var(--border); border-radius: 6px;
+    color: var(--text); padding: 6px 8px; font-size: 0.9rem; font-family: inherit; width: 100%;
+  }
+  .expense-row input:focus, .expense-row select:focus { outline: none; border-color: var(--accent); }
+  .expense-row .proj { text-align: right; font-variant-numeric: tabular-nums; font-size: 0.9rem; color: var(--text-secondary); }
+  .expense-row .proj.base { color: var(--green); font-weight: 600; }
+  .col-headers {
+    display: grid;
+    grid-template-columns: 36px 1fr 28px 100px 90px 80px 80px 80px 80px 40px;
+    gap: 8px; padding: 8px 16px; font-size: 0.7rem; text-transform: uppercase;
+    color: var(--text-muted); letter-spacing: 0.4px;
+  }
+  .collapsible-header {
+    display: flex; justify-content: space-between; align-items: center;
+    cursor: pointer; user-select: none;
+  }
+  .collapsible-header:hover { opacity: 0.85; }
+  .collapse-icon { font-size: 1.1rem; color: var(--text-muted); font-weight: 500; }
+  .collapsed .collapse-icon::before { content: "+"; } .collapsed .collapse-icon { font-size: 0; } .collapsed .collapse-icon::before { font-size: 1.1rem; }
+  .collapsible-body { overflow: hidden; transition: max-height 0.25s ease; }
+  .collapsed .collapsible-body { max-height: 0 !important; }
+
+  .charts {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px;
+  }
+  .chart-card {
+    background: linear-gradient(145deg, #161b22 0%, #0d1117 100%);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 14px 16px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.03);
+    position: relative;
+    overflow: hidden;
+  }
+  .chart-card::before {
+    content: "";
+    position: absolute; top: 0; left: 0; right: 0; height: 2px;
+    background: linear-gradient(90deg, var(--accent), var(--purple), var(--green));
+    opacity: 0.6;
+  }
+  .chart-card h3 {
+    font-size: 0.75rem; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.6px; color: var(--text-muted); margin-bottom: 8px;
+  }
+  .chart-card canvas { max-height: 160px; }
+  .savings-panel {
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: 14px; padding: 20px; margin-bottom: 20px;
+  }
+  .savings-panel h3 { font-size: 1rem; margin-bottom: 14px; }
+  .savings-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .savings-item label { font-size: 0.75rem; color: var(--text-muted); display: block; margin-bottom: 4px; }
+  .savings-item input {
+    background: #0d1117; border: 1px solid var(--border); border-radius: 6px;
+    color: var(--text); padding: 8px 10px; font-size: 1rem; width: 100%; font-family: inherit;
+  }
+  .savings-projections { margin-top: 16px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  .proj-card { background: var(--bg-elevated); border-radius: 8px; padding: 12px; text-align: center; }
+  .proj-card .label { font-size: 0.7rem; color: var(--text-muted); }
+  .proj-card .value { font-size: 1.1rem; font-weight: 600; margin-top: 4px; color: var(--green); }
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.65);
+    display: none; align-items: center; justify-content: center; z-index: 1000;
+  }
+  .modal-overlay.active { display: flex; }
+  .modal {
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: 16px; width: min(480px, 92vw); padding: 0;
+  }
+  .modal-header { padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+  .modal-body { padding: 16px 20px; }
+  .modal-footer { padding: 12px 20px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 8px; }
+  @media (max-width: 900px) {
+    .summary, .charts, .savings-grid, .savings-projections { grid-template-columns: 1fr 1fr; }
+    .expense-row, .col-headers { grid-template-columns: 1fr 80px 70px 40px; }
+    .expense-row .proj:nth-child(n+5), .col-headers span:nth-child(n+5) { display: none; }
+  }
+
+  .salary-toggle {
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: 12px; padding: 12px 16px; margin-bottom: 16px;
+    cursor: pointer; display: flex; justify-content: space-between; align-items: center;
+  }
+  .salary-toggle:hover { border-color: var(--accent); }
+  .salary-details {
+    display: none; background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: 12px; padding: 20px; margin-bottom: 20px;
+  }
+  .salary-details.open { display: block; }
+  .salary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .salary-col h4 { font-size: 0.85rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 10px; }
+  .salary-row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
+  .salary-row:last-child { border-bottom: none; }
+  .salary-row .label { color: var(--text-secondary); }
+  .salary-row .value { font-variant-numeric: tabular-nums; }
+  .salary-row.total { font-weight: 600; border-top: 1px solid var(--border); margin-top: 6px; padding-top: 10px; }
+  .salary-inputs { display: flex; gap: 16px; margin-bottom: 16px; flex-wrap: wrap; }
+  .salary-inputs label { font-size: 0.8rem; color: var(--text-muted); display: block; margin-bottom: 4px; }
+  .salary-inputs input, .salary-inputs select {
+    background: #0d1117; border: 1px solid var(--border); border-radius: 6px;
+    color: var(--text); padding: 8px 10px; font-size: 0.95rem; font-family: inherit;
+  }
+  .super-proj { margin-top: 16px; }
+  .super-proj table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+  .super-proj th, .super-proj td { text-align: right; padding: 6px 8px; border-bottom: 1px solid var(--border); }
+  .super-proj th:first-child, .super-proj td:first-child { text-align: left; }
+  .super-proj th { color: var(--text-muted); font-weight: 500; }
+
+
+  .salary-cards { display: flex; gap: 16px; margin-bottom: 16px; flex-wrap: wrap; align-items: stretch; }
+  .salary-card {
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: 14px; padding: 18px 22px; min-width: 220px; flex: 1;
+    position: relative; cursor: pointer; transition: border-color 0.15s;
+  }
+  .salary-card:hover { border-color: var(--border-light, #3a414b); }
+  .salary-card.gross { border-color: rgba(63,185,80,0.4); }
+  .salary-card .label { font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+  .salary-card .display {
+    font-family: "Source Sans 3", sans-serif; font-size: 1.8rem; font-weight: 700;
+    margin-top: 4px; letter-spacing: -0.5px;
+  }
+  .salary-card.gross .display { color: var(--green); }
+  .salary-card .edit-btn {
+    position: absolute; top: 12px; right: 12px;
+    background: transparent; border: none; color: var(--text-muted);
+    cursor: pointer; padding: 4px; border-radius: 4px;
+  }
+  .salary-card .edit-btn:hover { color: var(--text); background: var(--bg-elevated); }
+  .salary-card input.editing {
+    background: #0d1117; border: 1px solid var(--accent); border-radius: 8px;
+    color: var(--text); padding: 8px 12px; font-size: 1.4rem; font-weight: 600;
+    width: 100%; margin-top: 6px; font-family: inherit;
+  }
+  .salary-card input.editing:focus { outline: none; box-shadow: 0 0 0 3px var(--accent-glow); }
+  .phone-field { display: flex; flex-direction: column; justify-content: center; }
+  .phone-field label { font-size: 0.75rem; color: var(--text-muted); margin-bottom: 4px; }
+  .phone-field input {
+    background: #0d1117; border: 1px solid var(--border); border-radius: 8px;
+    color: var(--text); padding: 8px 12px; font-size: 1rem; width: 100px; font-family: inherit;
+  }
+
+
+  .slim-cards { display: none; gap: 10px; align-items: center; }
+  header.slim .slim-cards { display: flex; }
+  .slim-card {
+    background: rgba(13,17,23,0.8); border: 1px solid var(--border);
+    border-radius: 8px; padding: 4px 10px; cursor: pointer;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .slim-card.gross { border-color: rgba(63,185,80,0.4); }
+  .slim-card .lbl { font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase; }
+  .slim-card .val { font-family: "Source Sans 3", sans-serif; font-size: 0.95rem; font-weight: 650; }
+  .slim-card.gross .val { color: var(--green); }
+  .slim-card input {
+    background: transparent; border: none; color: var(--text);
+    font-size: 0.95rem; font-weight: 650; width: 80px; font-family: inherit;
+  }
+  .slim-card input:focus { outline: none; }
+
+
+  .exp-icon { width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; border-radius: 6px; background: var(--bg-elevated); }
+  .exp-icon svg { width: 16px; height: 16px; stroke: var(--text-secondary); }
+  .cat-label { font-size: 0.75rem; color: var(--text-muted); text-transform: capitalize; }
+  .settings-btn { display: none; position: fixed; bottom: 20px; right: 20px; width: 44px; height: 44px; border-radius: 50%; background: var(--accent); border: none; color: #fff; cursor: pointer; box-shadow: 0 4px 16px rgba(91,156,245,0.4); z-index: 100; display: flex; align-items: center; justify-content: center; }
+  .settings-btn:hover { filter: brightness(1.1); }
+
+
+  /* Slim dark scrollbars — all contexts */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #2a3038 #0d1117;
+  }
+  *::-webkit-scrollbar { width: 6px; height: 6px; }
+  *::-webkit-scrollbar-track { background: #0d1117; }
+  *::-webkit-scrollbar-thumb { background: #2a3038; border-radius: 3px; }
+  *::-webkit-scrollbar-thumb:hover { background: #3a414b; }
+  *::-webkit-scrollbar-corner { background: #0d1117; }
+
+
+  :root { --density: 1; }
+  body.density-compact { --density: 0.85; }
+  body.density-large { --density: 1.15; }
+  body.density-compact { font-size: 14px; }
+  body.density-large { font-size: 17px; }
+  body.density-compact .expense-row { padding: 5px 12px; }
+  body.density-large .expense-row { padding: 12px 18px; }
+  body.density-compact .stat { padding: 10px 12px; }
+  body.density-large .stat { padding: 18px 20px; }
+  body.density-compact .section-header { padding: 8px 12px; }
+  body.density-large .section-header { padding: 16px 20px; }
+  body.density-compact td, body.density-compact th { padding: 6px 8px; }
+  body.density-large td, body.density-large th { padding: 12px 14px; }
+
+  .density-toggle {
+    position: fixed; bottom: 20px; left: 20px;
+    display: flex; background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: 20px; padding: 3px; z-index: 100;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+  }
+  .density-toggle button {
+    background: transparent; border: none; color: var(--text-muted);
+    padding: 6px 10px; border-radius: 16px; cursor: pointer;
+    font-size: 0.7rem; font-weight: 500; transition: all 0.15s;
+  }
+  .density-toggle button.active { background: var(--accent); color: #fff; }
+  .density-toggle button:hover:not(.active) { color: var(--text); }
+
+
+  .leftover-sub {
+    font-size: 0.75rem; margin-top: 4px; font-weight: 500;
+  }
+  .leftover-sub.ok { color: var(--green); }
+  .leftover-sub.warn { color: var(--orange); }
+  .leftover-sub.bad { color: var(--red); }
+  .purchase-row {
+    display: grid; grid-template-columns: 28px 1fr 80px 100px 40px;
+    gap: 8px; align-items: center; padding: 8px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  .purchase-row .name-input { color: #a78bfa; }
+  .purchase-row input {
+    background: #0d1117; border: 1px solid var(--border); border-radius: 6px;
+    color: var(--text); padding: 6px 8px; font-size: 0.9rem; font-family: inherit;
+  }
+  .purchase-row .amt { text-align: right; font-variant-numeric: tabular-nums; }
+
+
+  .income-sources-btn {
+    background: transparent; border: 1px dashed var(--border); color: var(--text-muted);
+    padding: 8px 14px; border-radius: 8px; font-size: 0.8rem; cursor: pointer;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .income-sources-btn:hover { border-color: var(--accent); color: var(--text); }
+  .source-row {
+    display: grid; grid-template-columns: 24px 1fr 100px 40px;
+    gap: 8px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border);
+  }
+  .source-row input[type="text"], .source-row input[type="number"] {
+    background: #0d1117; border: 1px solid var(--border); border-radius: 6px;
+    color: var(--text); padding: 6px 8px; font-size: 0.9rem; font-family: inherit;
+  }
+  .source-dropdown {
+    position: relative; display: inline-block;
+  }
+  .source-dropdown-menu {
+    display: none; position: absolute; top: 100%; left: 0; margin-top: 4px;
+    background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px;
+    padding: 8px; min-width: 180px; z-index: 50; box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  }
+  .source-dropdown.open .source-dropdown-menu { display: block; }
+  .source-dropdown-menu label {
+    display: flex; align-items: center; gap: 8px; padding: 6px 4px;
+    font-size: 0.85rem; cursor: pointer;
+  }
+  .source-dropdown-menu label:hover { background: var(--bg-elevated); border-radius: 4px; }
+
+
+  .period-nav {
+    position: absolute; left: 50%; transform: translateX(-50%);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .period-nav h2 {
+    font-family: "Source Sans 3", sans-serif; font-size: 1.3rem; font-weight: 700;
+    min-width: 200px; text-align: center;
+  }
+  .period-nav button { padding: 6px 12px; }
+
+
+  .expense-row:hover { background: rgba(255,255,255,0.03); }
+  .expense-row.paid { background: rgba(63,185,80,0.06); }
+  .expense-row.paid input, .expense-row.paid .cat-label, .expense-row.paid .proj { color: var(--text-muted); }
+  .paid-check {
+    width: 20px; height: 20px; border: 1.5px solid var(--border); border-radius: 4px;
+    display: flex; align-items: center; justify-content: center; cursor: pointer;
+    background: transparent; transition: all 0.15s;
+  }
+  .paid-check.checked { background: var(--green); border-color: var(--green); }
+  .paid-check svg { width: 12px; height: 12px; stroke: #fff; opacity: 0; }
+  .paid-check.checked svg { opacity: 1; }
+
+
+  .picker-item {
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+    padding: 12px 8px; border-radius: 8px; cursor: pointer; transition: background 0.15s;
+  }
+  .picker-item:hover { background: var(--bg-elevated); }
+  .picker-icon { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; }
+  .picker-icon svg { width: 20px; height: 20px; }
+  .picker-item span { font-size: 0.75rem; color: var(--text-secondary); }
+
+
+  .insight-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-top: 16px; }
+  .insight-card {
+    background: var(--bg-elevated); border-radius: 10px; padding: 14px;
+    display: flex; align-items: flex-start; gap: 12px; border: 1px solid var(--border);
+  }
+  .insight-card .icon { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .insight-card .icon svg { width: 16px; height: 16px; }
+  .insight-card .text { font-size: 0.85rem; color: var(--text-secondary); line-height: 1.4; }
+  .insight-card.green .icon { background: rgba(63,185,80,0.15); color: var(--green); }
+  .insight-card.blue .icon { background: rgba(91,156,245,0.15); color: var(--accent); }
+  .insight-card.orange .icon { background: rgba(210,153,34,0.15); color: var(--orange); }
+
+
+  /* v2 visual system */
+  body {
+    background:
+      radial-gradient(1100px 480px at 8% -8%, rgba(90,140,220,.18), transparent 62%),
+      radial-gradient(820px 420px at 100% -4%, rgba(124,92,196,.1), transparent 58%),
+      radial-gradient(900px 520px at 50% 115%, rgba(36,64,108,.22), transparent 55%),
+      #07090d;
+    padding: 12px 16px 48px;
+  }
+  header {
+    top: 8px;
+    padding: 8px 14px;
+    margin: 0 0 12px;
+    border-radius: 14px;
+    border: 1px solid rgba(186,206,230,.16);
+    background:
+      linear-gradient(180deg, rgba(255,255,255,.055), rgba(255,255,255,.015)),
+      rgba(14,18,26,.82);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.07), 0 16px 40px rgba(0,0,0,.4);
+    backdrop-filter: blur(22px) saturate(1.3);
+  }
+  header.slim {
+    padding: 8px 16px;
+    background:
+      linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.012)),
+      rgba(8,11,16,.92);
+  }
+  .logo { width: 44px; height: 44px; border-radius: 12px; box-shadow: 0 0 0 1px rgba(126,176,255,.22); }
+  .identity h1 { font-size: 1.2rem; }
+  .identity .role { font-size: .8rem; }
+  .page-title {
+    font-size: .95rem; letter-spacing: .08em;
+    background: linear-gradient(90deg, #f7f9fc, #b7c8dc);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .page-title::before {
+    content: ""; width: 3px; height: 14px; border-radius: 3px;
+    background: linear-gradient(180deg, #c5d9ff, #5b8def);
+  }
+  .sync-status {
+    border: 1px solid rgba(176,196,220,.14); border-radius: 999px; padding: 3px 10px; font-size: .74rem;
+    background: rgba(255,255,255,.03);
+  }
+  .btn, button {
+    background: linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.015));
+    border: 1px solid rgba(176,196,220,.16);
+    border-radius: 8px; padding: 6px 11px; font-size: .8rem;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.04);
+  }
+  .btn.primary, .btn[onclick="exportPDF()"] { }
+  .btn:hover { border-color: rgba(196,214,236,.28); }
+  .stat, .salary-card, .section, .savings-panel, .proj-card, .insight-card, .modal, .chart-card {
+    background:
+      linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.012) 42%, transparent),
+      #121820;
+    border: 1px solid rgba(176,196,220,.14);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.05), 0 12px 28px rgba(0,0,0,.22);
+  }
+  .stat, .salary-card { border-radius: 12px; padding: 10px 14px; position: relative; overflow: hidden; }
+  .stat::before, .salary-card::before, .chart-card::before {
+    content: ""; position: absolute; left: 12px; right: 12px; top: 0; height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(158,190,240,.85), transparent);
+  }
+  .salary-card.gross { border-color: rgba(61,204,110,.4); }
+  .salary-card .display { font-size: 1.55rem; }
+  .stat .value { font-size: 1.2rem; }
+  .section { border-radius: 14px; }
+  .section-header { background: linear-gradient(180deg, #1c2532, #151c26); }
+  .modal-overlay {
+    background: radial-gradient(600px 280px at 50% 30%, rgba(90,140,220,.12), transparent 70%), rgba(4,6,10,.72);
+    backdrop-filter: blur(10px);
+  }
+  .modal { border-radius: 18px; animation: modal-in .2s ease; }
+  @keyframes modal-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+  .charts { grid-template-columns: 1.05fr .95fr; gap: 10px; }
+  .chart-card { border-radius: 14px; padding: 12px 14px 8px; }
+  .chart-card.wide { grid-column: 1 / -1; }
+  .chart-card h3 { letter-spacing: .08em; margin-bottom: 4px; }
+  .chart-stage { position: relative; min-height: 230px; perspective: 900px; }
+  .chart-stage canvas {
+    max-height: 250px !important;
+    transform: rotateX(12deg);
+    transform-origin: center 72%;
+    filter: drop-shadow(0 16px 12px rgba(0,0,0,.5));
+    transition: transform .45s ease, filter .45s ease;
+  }
+  .chart-card:hover canvas {
+    transform: rotateX(3deg) scale(1.025);
+    filter: drop-shadow(0 22px 16px rgba(90,140,220,.28));
+  }
+  .insight-cards { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }
+  .insight-card {
+    border-radius: 12px; padding: 12px;
+    animation: insight-in .55s ease both;
+    transition: transform .2s ease, border-color .2s ease;
+  }
+  .insight-card:hover { transform: translateY(-3px); border-color: rgba(196,214,236,.32); }
+  .insight-card .kicker { font-size: .66rem; letter-spacing: .08em; text-transform: uppercase; color: var(--text-muted); }
+  .insight-card .figure { font-family: "Source Sans 3", sans-serif; font-size: 1.15rem; font-weight: 750; margin: 2px 0; letter-spacing: -.3px; }
+  .insight-card .text { font-size: .78rem; }
+  .insight-card.green .figure { color: var(--green); }
+  .insight-card.blue .figure { color: #7eb0ff; }
+  .insight-card.orange .figure { color: #f0a05a; }
+  .insight-card.red .figure { color: var(--red); }
+  @keyframes insight-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+  input, select, textarea {
+    background: #0c1016; border-color: rgba(176,196,220,.16);
+  }
+  input:focus, select:focus { box-shadow: 0 0 0 3px rgba(126,176,255,.2); }
+  .btn.primary, .btn[onclick="exportPDF()"] {
+    background: linear-gradient(180deg, #9ec2ff, #4f86ee) !important;
+    color: #fff !important;
+    border-color: rgba(190,214,255,.65) !important;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.35), 0 8px 18px rgba(79,134,238,.28);
+  }
+  .chart-card { overflow: visible; }
+  #chartsSection:not(.collapsed),
+  #chartsSection:not(.collapsed) .collapsible-body { overflow: visible; }
+  .chart-stage { padding: 4px 6px 18px; }
+  .chart-stage::after {
+    content: "";
+    position: absolute; left: 16%; right: 16%; bottom: 4px; height: 22px;
+    background: radial-gradient(ellipse at center, rgba(0,0,0,.55), transparent 70%);
+    pointer-events: none;
+  }
+  .chart-stage canvas { position: relative; z-index: 1; }
+  .chart-stage.bars canvas { transform: rotateX(14deg) rotateY(-8deg); }
+  .chart-card:hover .chart-stage.bars canvas {
+    transform: rotateX(4deg) rotateY(-2deg) scale(1.03);
+    filter: drop-shadow(0 22px 16px rgba(90,140,220,.32));
+  }
+  .modal-header h2 { font-family: "Source Sans 3", sans-serif; font-size: 1.02rem; font-weight: 750; letter-spacing: -.2px; }
+  .modal-header { background: linear-gradient(180deg, rgba(255,255,255,.05), transparent); }
+  .insight-card .insight-copy { min-width: 0; }
+  .insight-card.red .icon { background: rgba(248,81,73,.15); color: var(--red); }
+  .insight-card.red .figure { color: var(--red); }
+  .picker-item { border: 1px solid rgba(176,196,220,.12); border-radius: 10px; transition: transform .16s ease, border-color .16s ease, background .16s ease; }
+  .picker-item:hover { transform: translateY(-2px); border-color: rgba(126,176,255,.5); background: rgba(126,176,255,.08); }
+
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <div class="brand">
+      <div class="logo"><img src="https://raw.githubusercontent.com/BSMediaGroup/DanielClancy/refs/heads/main/assets/logos/logomatteblue.webp" alt="DC"></div>
+      <div class="identity">
+        <h1>Daniel Clancy</h1>
+        <div class="role">Budget</div>
+      </div>
+    </div>
+    <div class="period-nav">
+      <button class="btn small" id="prevPeriodBtn" onclick="prevPeriod()" title="Previous" style="padding:6px 8px;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
+      <span id="periodTitle" style="font-family:'Source Sans 3',sans-serif; font-size:0.95rem; font-weight:600; min-width:140px; text-align:center; cursor:pointer;" onclick="openPeriodManager()" title="Manage periods">Budget</span>
+      <button class="btn small" onclick="nextPeriod()" title="Next" style="padding:6px 8px;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+      </button>
+    </div>
+    <div style="display:flex; align-items:center; gap:10px;">
+      <div class="slim-cards">
+        <div class="slim-card gross" onclick="editSlim('gross')">
+          <span class="lbl">Gross</span>
+          <span class="val" id="slimGross">$90,000</span>
+          <input type="number" id="slimGrossInput" style="display:none;" onblur="finishSlim('gross')" onkeydown="if(event.key==='Enter')this.blur()">
+        </div>
+        <div class="slim-card" onclick="editSlim('net')">
+          <span class="lbl">Net</span>
+          <span class="val" id="slimNet">$5,888</span>
+          <input type="number" id="slimNetInput" style="display:none;" onblur="finishSlim('net')" onkeydown="if(event.key==='Enter')this.blur()">
+        </div>
+      </div>
+      <button class="btn small" onclick="logout()">Sign out</button>
+    </div>
+  </header>
+
+  <div class="title-row">
+    <div class="page-title">Budget Ledger</div>
+    <span class="sync-status" id="syncStatus">Ready</span>
+  </div>
+
+  <div class="actions">
+    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+      <button class="btn" onclick="exportJSON()">Export JSON</button>
+      <button class="btn" onclick="document.getElementById('importFile').click()">Import JSON</button>
+      <input type="file" id="importFile" accept=".json" style="display:none" onchange="importJSON(event)">
+      <button class="btn" onclick="openShareModal()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px;"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>Share</button>
+      <button class="btn" onclick="exportPDF()" style="background:var(--accent); color:#fff; border-color:var(--accent);">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+        PDF
+      </button>
+      <button class="btn" onclick="document.getElementById('savingsSection').scrollIntoView({behavior:'smooth'})">Savings</button>
+      <button class="btn" onclick="document.getElementById('ytdSection').scrollIntoView({behavior:'smooth'})">YTD</button>
+    </div>
+    <div style="display:flex; gap:8px;">
+      <button class="btn small" onclick="forceRefresh()">Refresh</button>
+      <button class="btn small" onclick="forcePush()">Push</button>
+    </div>
+  </div>
+
+  <div class="salary-cards">
+    <div class="salary-card gross" onclick="editField('gross')">
+      <button class="edit-btn" onclick="event.stopPropagation(); editField('gross')" title="Edit"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>
+      <div class="label">Gross annual salary (plus super)</div>
+      <div style="display:flex; align-items:center; gap:10px;">
+        <div class="display" id="grossDisplay">$90,000</div>
+        <div style="display:flex; flex-direction:column; line-height:1.15; justify-content:center;">
+          <span id="superDisplay" style="font-size:0.72rem; color:var(--text-muted); font-weight:500;"></span>
+          <span id="totalRemDisplay" style="font-size:0.68rem; color:var(--text-muted);"></span>
+        </div>
+      </div>
+      <input type="number" id="grossSalaryTop" value="90000" step="100" class="editing" style="display:none;" onblur="finishEdit('gross')" onkeydown="if(event.key==='Enter')this.blur()">
+    </div>
+    <div class="salary-card" onclick="editField('net')">
+      <button class="edit-btn" onclick="event.stopPropagation(); editField('net')" title="Edit"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>
+      <div class="label">Net monthly (after tax)</div>
+      <div class="display" id="netDisplay">$5,888</div>
+      <input type="number" id="income" value="5888" step="0.01" class="editing" style="display:none;" onblur="finishEdit('net')" onkeydown="if(event.key==='Enter')this.blur()">
+    </div>
+    <div class="salary-card" onclick="editField('phone')">
+      <button class="edit-btn" onclick="event.stopPropagation(); editField('phone')" title="Edit"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>
+      <div class="label">Phone allowance / month</div>
+      <div class="display" id="phoneDisplay">$44</div>
+      <input type="number" id="phoneAllowance" value="44" step="1" class="editing" style="display:none;" onblur="finishEdit('phone')" onkeydown="if(event.key==='Enter')this.blur()">
+    </div>
+  </div>
+  <div style="display:flex; gap:12px; align-items:center; margin-bottom:16px;">
+    <button class="income-sources-btn" onclick="openIncomeModal()">+ Additional income sources</button>
+    <div class="source-dropdown" id="sourceDropdown">
+      <button class="btn small" onclick="toggleSourceDropdown()">Include ▾</button>
+      <div class="source-dropdown-menu" id="sourceMenu"></div>
+    </div>
+  </div>
+
+  <div class="salary-toggle" onclick="toggleSalary()">
+    <span>Salary details — tax, Medicare, super</span>
+    <span id="salaryChevron" class="collapse-icon">−</span>
+  </div>
+  <div class="salary-details" id="salaryDetails">
+    <div class="salary-inputs">
+      <div>
+        <label>Gross annual salary</label>
+        <input type="number" id="grossSalary" value="90000" step="100" oninput="syncGrossFromDetail(); calcSalary(); scheduleSave();">
+      </div>
+      <div>
+        <label>Super rate %</label>
+        <input type="number" id="superRate" value="12" step="0.5" min="0" max="30" oninput="calcSalary(); scheduleSave();">
+      </div>
+      <div>
+        <label>HELP/HECS debt</label>
+        <select id="hasHelp" onchange="calcSalary(); scheduleSave();">
+          <option value="0">No</option>
+          <option value="1">Yes</option>
+        </select>
+      </div>
+    </div>
+    <div class="salary-grid">
+      <div class="salary-col">
+        <h4>Annual breakdown</h4>
+        <div id="salaryBreakdown"></div>
+      </div>
+      <div class="salary-col">
+        <h4>Pay periods (net)</h4>
+        <div id="payPeriods"></div>
+      </div>
+    </div>
+    <div class="super-proj">
+      <h4 style="font-size:0.85rem; color:var(--text-muted); text-transform:uppercase; margin-bottom:10px;">Super projections (employer only)</h4>
+      <table id="superTable"></table>
+    </div>
+  </div>
+
+  <div class="summary">
+    <div class="stat">
+      <div class="label">Income / month</div>
+      <div class="value" id="sumIncome">$0</div>
+    </div>
+    <div class="stat">
+      <div class="label">Expenses / month</div>
+      <div class="value" id="sumExpenses">$0</div>
+    </div>
+    <div class="stat">
+      <div class="label">Savings / month</div>
+      <div class="value" id="sumSavings">$0</div>
+    </div>
+    <div class="stat">
+      <div class="label">Leftover / month</div>
+      <div class="value green" id="sumLeftover">$0</div>
+      <div class="leftover-sub" id="leftoverAfterPurchases"></div>
+    </div>
+  </div>
+
+  <div class="section" id="chartsSection">
+    <div class="section-header collapsible-header" onclick="toggleSection('chartsSection')">
+      <h3>Charts</h3>
+      <span class="collapse-icon">−</span>
+    </div>
+    <div class="collapsible-body">
+      <div class="charts" style="padding:12px;">
+        <div class="chart-card">
+          <h3>Expense mix</h3>
+          <div class="chart-stage"><canvas id="pieChart"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <h3>Monthly allocation</h3>
+          <div class="chart-stage bars"><canvas id="barChart"></canvas></div>
+        </div>
+        <div class="chart-card wide">
+          <h3>Spend by category</h3>
+          <div class="chart-stage bars"><canvas id="catChart"></canvas></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  
+  
+  </div>
+
+  <div id="expenseSections"></div>
+  <div class="section" id="purchasesSection">
+    <div class="section-header collapsible-header" onclick="toggleSection('purchasesSection')">
+      <h3 style="color:var(--orange);">One-off purchases</h3>
+      <div style="display:flex; align-items:center; gap:8px;">
+        <button class="btn small" onclick="event.stopPropagation(); addPurchase()">+ Add</button>
+        <span class="collapse-icon">−</span>
+      </div>
+    </div>
+    <div class="collapsible-body">
+      <div id="purchasesList"></div>
+    </div>
+  </div>
+
+  <div class="section" id="savingsSection">
+    <div class="section-header collapsible-header" onclick="toggleSection('savingsSection')">
+      <h3>Savings</h3>
+      <span class="collapse-icon">−</span>
+    </div>
+    <div class="collapsible-body">
+    <div class="section" id="savingsSection"><div class="savings-panel" style="border:none; margin:0;">
+    <div class="savings-grid">
+      <div class="savings-item">
+        <label>Monthly savings target</label>
+        <input type="number" id="savingsAmount" value="850" step="0.01" oninput="scheduleSave(); render()">
+      </div>
+      <div class="savings-item">
+        <label>Goal amount</label>
+        <input type="number" id="savingsGoal" value="10000" step="1" oninput="scheduleSave(); render()">
+      </div>
+      <div class="savings-item">
+        <label>Current balance</label>
+        <input type="number" id="savingsBalance" value="0" step="0.01" oninput="scheduleSave(); render()">
+      </div>
+    </div>
+    <div class="savings-projections" id="savingsProjections"></div>
+    </div></div></div>
+</div>
+
+<!-- Share Modal -->
+
+  <div class="section" id="ytdSection">
+    <div class="section-header collapsible-header" onclick="toggleSection('ytdSection')">
+      <h3>Year to date</h3>
+      <span class="collapse-icon">−</span>
+    </div>
+    <div class="collapsible-body">
+      <div class="section-body" id="ytdContent" style="padding:16px;">
+        <div class="summary" id="ytdSummary"></div>
+        <div id="ytdInsights"></div>
+      </div>
+    </div>
+  </div>
+
+<div class="modal-overlay" id="shareModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>Share Budget</h2>
+      <button class="btn" onclick="closeShareModal()" style="padding:4px 8px;">&times;</button>
+    </div>
+    <div class="modal-body">
+      <label style="font-size:0.8rem; color:var(--text-muted); display:block; margin-bottom:6px;">Link expiry</label>
+      <select id="shareExpiry" style="width:100%; background:#0d1117; border:1px solid var(--border); color:var(--text); padding:8px; border-radius:6px; margin-bottom:12px;">
+        <option value="24h">24 hours</option>
+        <option value="48h">48 hours</option>
+        <option value="7d" selected>7 days</option>
+        <option value="30d">30 days</option>
+        <option value="never">Never</option>
+      </select>
+      <label style="display:flex; align-items:center; gap:8px; font-size:0.9rem; margin-bottom:12px;">
+        <input type="checkbox" id="sharePassword"> Require password
+      </label>
+      <div id="shareResult" style="display:none;">
+        <div style="display:flex; gap:8px;">
+          <input id="shareLink" readonly style="flex:1; background:#0d1117; border:1px solid var(--border); border-radius:6px; color:var(--text); padding:8px;">
+          <button class="btn" id="copyBtn" onclick="copyShareLink()" style="display:flex; align-items:center; gap:6px;">
+            <svg id="copyIcon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            <span id="copyText">Copy</span>
+          </button>
+        </div>
+        <button class="btn" style="margin-top:10px; width:100%;" onclick="mailtoShare()">Send via email</button>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeShareModal()">Close</button>
+      <button class="btn primary" onclick="generateShare()">Generate</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const FREQS = ["day", "week", "2week", "4week", "month", "year"];
+const FREQ_DAYS = { day: 1, week: 7, "2week": 14, "4week": 28, month: 365 / 12, year: 365 };
+const FREQ_LABELS = { day: "Daily", week: "Weekly", "2week": "Fortnightly", "4week": "4-Weekly", month: "Monthly", year: "Yearly" };
+
+
+let budgetInterval = "month";
+let periods = {};
+let currentPeriodKey = "";
+
+function getPeriodKey(date, interval) {
+  const d = new Date(date);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  if (interval === "day") return `${y}-${m}-${day}`;
+  if (interval === "week") {
+    const start = new Date(d);
+    start.setDate(d.getDate() - d.getDay());
+    return `${start.getFullYear()}-W${String(Math.ceil((start.getDate()) / 7)).padStart(2, "0")}`;
+  }
+  if (interval === "fortnight") {
+    const fn = Math.ceil(d.getDate() / 14);
+    return `${y}-${m}-F${fn}`;
+  }
+  return `${y}-${m}`;
+}
+
+function formatPeriodTitle(key, interval) {
+  if (interval === "month") {
+    const [y, m] = key.split("-");
+    const months = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+    return `Budget ${months[parseInt(m) - 1]} ${y}`;
+  }
+  if (interval === "week") return `Budget week ${key}`;
+  if (interval === "fortnight") return `Budget fortnight ${key}`;
+  return `Budget ${key}`;
+}
+
+function ensurePeriod(key) {
+  if (!periods[key]) {
+    const prev = Object.keys(periods).sort().reverse().find(k => k < key);
+    const base = prev ? JSON.parse(JSON.stringify(periods[prev])) : null;
+    periods[key] = base || {
+      income: 5888, grossSalary: 90000, phoneAllowance: 44,
+      incomeSources: [{ id: "main", label: "Greg Natale Design", amount: 5888, included: true, isMain: true, hasSuper: true, superRate: 12, empType: "fulltime", incomeType: "wages", nation: "AU", state: "NSW", entryMode: "net", entryPeriod: "month", payFreq: "fortnightly", payDay: 15 }],
+      expenses: JSON.parse(JSON.stringify(DEFAULT_EXPENSES)),
+      purchases: [], savings: 850, savingsGoal: 10000, savingsBalance: 0
+    };
+  }
+  return periods[key];
+}
+
+function loadPeriod(key) {
+  currentPeriodKey = key;
+  const p = ensurePeriod(key);
+  document.getElementById("income").value = p.income ?? 5888;
+  document.getElementById("grossSalaryTop").value = p.grossSalary ?? 90000;
+  document.getElementById("grossSalary").value = p.grossSalary ?? 90000;
+  document.getElementById("phoneAllowance").value = p.phoneAllowance ?? 44;
+  document.getElementById("savingsAmount").value = p.savings ?? 850;
+  document.getElementById("savingsGoal").value = p.savingsGoal ?? 10000;
+  document.getElementById("savingsBalance").value = p.savingsBalance ?? 0;
+  expenses = p.expenses || [];
+  purchases = p.purchases || [];
+  incomeSources = p.incomeSources || [];
+  document.getElementById("periodTitle").textContent = formatPeriodTitle(key, budgetInterval);
+  updateDisplays();
+  updateSuperDisplay();
+  render();
+}
+
+function savePeriod() {
+  if (!currentPeriodKey) return;
+  periods[currentPeriodKey] = {
+    income: parseFloat(document.getElementById("income").value) || 0,
+    grossSalary: parseFloat(document.getElementById("grossSalary").value) || 90000,
+    phoneAllowance: parseFloat(document.getElementById("phoneAllowance").value) || 44,
+    incomeSources, expenses, purchases,
+    savings: parseFloat(document.getElementById("savingsAmount").value) || 0,
+    savingsGoal: parseFloat(document.getElementById("savingsGoal").value) || 0,
+    savingsBalance: parseFloat(document.getElementById("savingsBalance").value) || 0
+  };
+}
+
+function prevPeriod() {
+  savePeriod();
+  const keys = Object.keys(periods).sort();
+  const idx = keys.indexOf(currentPeriodKey);
+  if (idx > 0) {
+    loadPeriod(keys[idx - 1]);
+    scheduleSave();
+  }
+  updatePeriodButtons();
+}
+function updatePeriodButtons() {
+  const keys = Object.keys(periods).sort();
+  const idx = keys.indexOf(currentPeriodKey);
+  const prevBtn = document.getElementById("prevPeriodBtn");
+  if (prevBtn) {
+    prevBtn.disabled = idx <= 0;
+    prevBtn.style.opacity = idx <= 0 ? "0.4" : "1";
+  }
+}
+function nextPeriod() {
+  savePeriod();
+  const keys = Object.keys(periods).sort();
+  const idx = keys.indexOf(currentPeriodKey);
+  if (idx < keys.length - 1) {
+    loadPeriod(keys[idx + 1]);
+  } else {
+    // Auto-create next period based on current
+    const d = new Date();
+    if (budgetInterval === "month") d.setMonth(d.getMonth() + 1);
+    else if (budgetInterval === "week") d.setDate(d.getDate() + 7);
+    else if (budgetInterval === "fortnight") d.setDate(d.getDate() + 14);
+    else d.setDate(d.getDate() + 1);
+    const newKey = getPeriodKey(d, budgetInterval);
+    ensurePeriod(newKey);
+    loadPeriod(newKey);
+  }
+  scheduleSave();
+  updatePeriodButtons();
+}
+function setInterval(val) {
+  budgetInterval = val;
+  localStorage.setItem("budget_interval", val);
+  const key = getPeriodKey(new Date(), val);
+  loadPeriod(key);
+  scheduleSave();
+}
+
+let expenses = [];
+let saveTimer = null;
+let pieChart = null;
+let barChart = null;
+let catChart = null;
+let lastChartSig = "";
+
+const DEFAULT_EXPENSES = [
+  { name: "rent", frequency: "month", amount: 443.08 },
+  { name: "energy", frequency: "month", amount: 400 },
+  { name: "water", frequency: "week", amount: 5.5 },
+  { name: "internet", frequency: "month", amount: 172 },
+  { name: "phone", frequency: "month", amount: 47.67 },
+  { name: "work phone", frequency: "month", amount: 47.67 },
+  { name: "microsoft", frequency: "month", amount: 22 },
+  { name: "google", frequency: "month", amount: 22 },
+  { name: "apple", frequency: "month", amount: 14 },
+  { name: "opal", frequency: "week", amount: 40 },
+  { name: "medication", frequency: "week", amount: 120 },
+  { name: "coffee", frequency: "day", amount: 5 },
+  { name: "work lunches", frequency: "day", amount: 10 },
+  { name: "groceries (home)", frequency: "week", amount: 200 },
+  { name: "cigarettes", frequency: "week", amount: 30 }
+];
+
+function toDaily(amount, freq) {
+  return (Number(amount) || 0) / (FREQ_DAYS[freq] || 1);
+}
+function project(daily, freq) {
+  return daily * (FREQ_DAYS[freq] || 1);
+}
+function money(n) {
+  return "$" + (Number(n) || 0).toFixed(2);
+}
+
+
+const ICONS = {
+  home: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>',
+  car: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 16H9m10 0h3v-3.15a1 1 0 0 0-.84-.99L16 11l-2.7-3.6a1 1 0 0 0-.8-.4H5.24a2 2 0 0 0-1.8 1.1l-.8 1.63A6 6 0 0 0 2 12.42V16h2"/><circle cx="6.5" cy="16.5" r="2.5"/><circle cx="16.5" cy="16.5" r="2.5"/></svg>',
+  train: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="3" width="16" height="16" rx="2"/><path d="M4 11h16"/><path d="M12 3v8"/><path d="m8 19-2 3"/><path d="m16 19 2 3"/></svg>',
+  cart: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>',
+  utensils: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2v0a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/></svg>',
+  burger: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>',
+  zap: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>',
+  droplet: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg>',
+  wifi: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg>',
+  phone: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="2" width="12" height="20" rx="2.5"/><line x1="12" y1="18" x2="12.01" y2="18" stroke-width="3" stroke-linecap="round"/><rect x="9" y="4" width="6" height="1.5" rx="0.5" fill="currentColor" stroke="none"/></svg>',
+  heart: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>',
+  pill: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z"/><path d="m8.5 8.5 7 7"/></svg>',
+  card: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>',
+  cigarette: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 12H2v4h16"/><path d="M22 12v4"/><path d="M7 12v4"/><path d="M18 8c0-2.5-2-2.5-2-5"/><path d="M22 8c0-2.5-2-2.5-2-5"/></svg>',
+  film: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="2.18"/><line x1="7" y1="2" x2="7" y2="22"/><line x1="17" y1="2" x2="17" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/></svg>',
+  dice: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="2"/><path d="M16 8h.01"/><path d="M8 8h.01"/><path d="M8 16h.01"/><path d="M16 16h.01"/><path d="M12 12h.01"/></svg>',
+  bag: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>',
+  coffee: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>',
+  apple: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/></svg>',
+  microsoft: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z"/></svg>',
+  google: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12.48 10.92v3.28h7.84c-.24 1.84-.853 3.187-1.787 4.133-1.147 1.147-2.933 2.4-6.053 2.4-4.827 0-8.6-3.893-8.6-8.72s3.773-8.72 8.6-8.72c2.6 0 4.507 1.027 5.907 2.347l2.307-2.307C18.747 1.44 16.133 0 12.48 0 5.867 0 .307 5.387.307 12s5.56 12 12.173 12c3.573 0 6.267-1.173 8.373-3.36 2.16-2.16 2.84-5.213 2.84-7.667 0-.76-.053-1.467-.173-2.053H12.48z"/></svg>',
+  circle: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/></svg>',
+  star: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>',
+  gift: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><line x1="12" y1="22" x2="12" y2="7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/></svg>'
+};
+
+const CATEGORIES = {
+  housing: { label: "Housing", keywords: ["rent", "mortgage", "strata", "rates"], icon: ICONS.home },
+  transport: { label: "Transport", keywords: ["opal", "uber", "petrol", "fuel", "train", "bus", "transport", "parking"], icon: ICONS.train },
+  groceries: { label: "Groceries", keywords: ["groceries", "supermarket", "woolies", "coles"], icon: ICONS.cart },
+  dining: { label: "Dining", keywords: ["restaurant", "dinner", "lunch out"], icon: ICONS.utensils },
+  fastfood: { label: "Fast food", keywords: ["mcdonald", "kfc", "hungry jacks", "fast food"], icon: ICONS.burger },
+  coffee: { label: "Coffee", keywords: ["coffee", "cafe"], icon: ICONS.coffee },
+  power: { label: "Power", keywords: ["energy", "electricity", "power"], icon: ICONS.zap },
+  water: { label: "Water", keywords: ["water"], icon: ICONS.droplet },
+  internet: { label: "Internet", keywords: ["internet", "wifi", "nbn"], icon: ICONS.wifi },
+  phone: { label: "Phone", keywords: ["phone", "mobile", "recharge"], icon: ICONS.phone },
+  health: { label: "Health", keywords: ["medication", "pharmacy", "doctor", "health", "medical"], icon: ICONS.pill },
+  apple: { label: "Apple", keywords: ["apple", "icloud", "itunes"], icon: ICONS.apple },
+  microsoft: { label: "Microsoft", keywords: ["microsoft", "office", "xbox"], icon: ICONS.microsoft },
+  google: { label: "Google", keywords: ["google", "youtube", "gmail"], icon: ICONS.google },
+  subscriptions: { label: "Subscriptions", keywords: ["netflix", "spotify", "subscription", "disney"], icon: ICONS.card },
+  leisure: { label: "Leisure", keywords: ["cinema", "movie", "game", "hobby"], icon: ICONS.film },
+  gambling: { label: "Gambling", keywords: ["bet", "gambling", "poker", "casino"], icon: ICONS.dice },
+  retail: { label: "Retail", keywords: ["clothes", "shopping", "amazon", "ebay"], icon: ICONS.bag },
+  cigarettes: { label: "Cigarettes", keywords: ["cigarettes", "tobacco", "smokes"], icon: ICONS.cigarette },
+  other: { label: "Other", keywords: [], icon: ICONS.circle }
+};
+
+let categoryIcons = {};
+const _OLD_CATEGORIES = {
+  housing: { label: "Housing", keywords: ["rent", "mortgage", "strata", "rates"], icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>' },
+  transport: { label: "Transport", keywords: ["opal", "uber", "petrol", "fuel", "train", "bus", "transport", "parking"], icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="3" width="15" height="13" rx="2"/><path d="M16 8h4l3 3v5h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>' },
+  food: { label: "Food", keywords: ["coffee", "lunch", "groceries", "food", "restaurant", "takeaway", "meal"], icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>' },
+  utilities: { label: "Utilities", keywords: ["energy", "electricity", "water", "gas", "internet", "wifi"], icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>' },
+  phone: { label: "Phone", keywords: ["phone", "mobile", "recharge"], icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="2" width="12" height="20" rx="2.5"/><line x1="12" y1="18" x2="12.01" y2="18" stroke-width="3" stroke-linecap="round"/><rect x="9" y="4" width="6" height="1.5" rx="0.5" fill="currentColor" stroke="none"/></svg>' },
+  health: { label: "Health", keywords: ["medication", "pharmacy", "doctor", "health", "medical"], icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>' },
+  subscriptions: { label: "Subscriptions", keywords: ["microsoft", "google", "apple", "netflix", "spotify", "subscription"], icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>' },
+  vice: { label: "Vice", keywords: ["cigarettes", "tobacco", "alcohol", "beer", "wine"], icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>' },
+  other: { label: "Other", keywords: [], icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>' }
+};
+
+let customRules = {};
+
+function detectCategory(name) {
+  const n = (name || "").toLowerCase().trim();
+  // Check custom rules first
+  for (const [cat, words] of Object.entries(customRules)) {
+    if (words.some(w => n.includes(w.toLowerCase()))) {
+      return CATEGORIES[cat] || CATEGORIES.other;
+    }
+  }
+  // Default matching
+  for (const [key, cat] of Object.entries(CATEGORIES)) {
+    if (key === "other") continue;
+    if (cat.keywords.some(kw => n.includes(kw))) return cat;
+  }
+  return CATEGORIES.other;
+}
+
+
+let purchases = [];
+
+function addPurchase() {
+  purchases.push({ name: "Purchase", amount: 0 });
+  scheduleSave();
+  renderPurchases();
+}
+function updatePurchase(idx, field, value) {
+  purchases[idx][field] = value;
+  scheduleSave();
+  renderPurchases();
+  updatePurchaseSubtext();
+  renderYTD();
+}
+function removePurchase(idx) {
+  purchases.splice(idx, 1);
+  scheduleSave();
+  renderPurchases();
+  updatePurchaseSubtext();
+  renderYTD();
+}
+function renderPurchases() {
+  const el = document.getElementById("purchasesList");
+  if (!el) return;
+  if (purchases.length === 0) {
+    el.innerHTML = '<div style="padding:12px 16px; color:var(--text-muted); font-size:0.85rem;">No one-off purchases</div>';
+    return;
+  }
+  el.innerHTML = purchases.map((p, i) => {
+    const cat = p.categoryOverride ? (CATEGORIES[p.categoryOverride] || detectCategory(p.name)) : detectCategory(p.name);
+    return `<div class="purchase-row">
+      <div class="exp-icon" style="width:24px; height:24px; cursor:pointer;" ondblclick="openPurchaseCategoryPicker(${i})" title="Double-click to change">${cat.icon}</div>
+      <input type="text" value="${p.name}" class="name-input" onchange="updatePurchase(${i}, 'name', this.value)">
+      <span class="cat-label" style="color:#a78bfa; cursor:pointer;" ondblclick="openPurchaseCategoryPicker(${i})" title="Double-click to change">${cat.label}</span>
+      <input type="number" step="0.01" value="${p.amount}" class="amt" onchange="updatePurchase(${i}, 'amount', parseFloat(this.value)||0)">
+      <button class="btn small" onclick="removePurchase(${i})" style="padding:4px 8px;">✕</button>
+    </div>`;
+  }).join("");
+}
+function updatePurchaseSubtext() {
+  const income = getIncludedIncome() || parseFloat(document.getElementById("income").value) || 0;
+  const phone = parseFloat(document.getElementById("phoneAllowance").value) || 0;
+  const spendable = income + phone;
+  const savings = parseFloat(document.getElementById("savingsAmount").value) || 0;
+  let totalDaily = 0;
+  expenses.forEach(e => { totalDaily += toDaily(e.amount, e.frequency); });
+  const expMonth = project(totalDaily, "month");
+  const leftover = spendable - expMonth - savings;
+  const purchaseTotal = purchases.reduce((s, p) => s + (Number(p.amount) || 0), 0);
+  const after = leftover - purchaseTotal;
+  const el = document.getElementById("leftoverAfterPurchases");
+  if (!el) return;
+  if (purchaseTotal === 0) { el.textContent = ""; return; }
+  el.textContent = money(after) + " after purchases";
+  el.className = "leftover-sub " + (after >= 100 ? "ok" : after >= 0 ? "warn" : "bad");
+}
+
+
+let incomeSources = [
+  { id: "main", label: "Greg Natale Design", amount: 5888, included: true, isMain: true, hasSuper: true, superRate: 12, empType: "fulltime", incomeType: "wages", nation: "AU", state: "NSW", entryMode: "net", entryPeriod: "month", payFreq: "fortnightly", payDay: 15 }
+];
+
+function openIncomeModal() {
+  renderIncomeSources();
+  document.getElementById("incomeModal").classList.add("active");
+}
+function closeIncomeModal() {
+  document.getElementById("incomeModal").classList.remove("active");
+}
+const SUPER_DEFAULTS = { AU: 12, US: 6, UK: 5, NZ: 3, CA: 5 };
+const NATIONS = ["AU", "US", "UK", "NZ", "CA", "Other"];
+const EMP_TYPES = ["fulltime", "parttime", "contract", "casual", "other"];
+const INCOME_TYPES = ["wages", "salary", "commission", "donations", "freelance", "investment", "other"];
+
+function renderIncomeSources() {
+  const el = document.getElementById("incomeSourcesList");
+  el.innerHTML = incomeSources.map((s, i) => `
+    <div style="background:var(--bg-elevated); border-radius:10px; padding:14px; margin-bottom:10px;">
+      <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
+        <input type="checkbox" ${s.included ? "checked" : ""} onchange="toggleSource(${i}, this.checked)">
+        <input type="text" value="${s.label}" onchange="updateSource(${i}, 'label', this.value)" style="flex:1; background:#0d1117; border:1px solid var(--border); border-radius:6px; color:var(--text); padding:6px 10px; font-weight:${s.isMain ? '600' : '400'};">
+        <div style="display:flex; gap:4px;">
+          <select onchange="updateSource(${i}, 'entryMode', this.value)" style="background:#0d1117; border:1px solid var(--border); color:var(--text); padding:4px; border-radius:4px; font-size:0.75rem;">
+            <option value="net" ${s.entryMode === 'net' ? 'selected' : ''}>Net</option>
+            <option value="gross" ${s.entryMode === 'gross' ? 'selected' : ''}>Gross</option>
+          </select>
+          <input type="number" step="0.01" value="${s.amount}" onchange="updateSource(${i}, 'amount', parseFloat(this.value)||0)" style="width:80px; background:#0d1117; border:1px solid var(--border); border-radius:4px; color:var(--text); padding:4px 6px;">
+          <select onchange="updateSource(${i}, 'entryPeriod', this.value)" style="background:#0d1117; border:1px solid var(--border); color:var(--text); padding:4px; border-radius:4px; font-size:0.75rem;">
+            <option value="year" ${s.entryPeriod === 'year' ? 'selected' : ''}>/year</option>
+            <option value="month" ${s.entryPeriod === 'month' ? 'selected' : ''}>/month</option>
+            <option value="fortnight" ${s.entryPeriod === 'fortnight' ? 'selected' : ''}>/fortnight</option>
+            <option value="week" ${s.entryPeriod === 'week' ? 'selected' : ''}>/week</option>
+          </select>
+        </div>
+        ${s.isMain ? '' : `<button class="btn small" onclick="removeSource(${i})">✕</button>`}
+      </div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; font-size:0.8rem;">
+        <div>
+          <label style="color:var(--text-muted); display:block; margin-bottom:2px;">Employment</label>
+          <select onchange="updateSource(${i}, 'empType', this.value)" style="width:100%; background:#0d1117; border:1px solid var(--border); color:var(--text); padding:4px; border-radius:4px;">
+            ${EMP_TYPES.map(t => `<option value="${t}" ${s.empType === t ? 'selected' : ''}>${t}</option>`).join('')}
+          </select>
+        </div>
+        <div>
+          <label style="color:var(--text-muted); display:block; margin-bottom:2px;">Income type</label>
+          <select onchange="updateSource(${i}, 'incomeType', this.value)" style="width:100%; background:#0d1117; border:1px solid var(--border); color:var(--text); padding:4px; border-radius:4px;">
+            ${INCOME_TYPES.map(t => `<option value="${t}" ${s.incomeType === t ? 'selected' : ''}>${t}</option>`).join('')}
+          </select>
+        </div>
+        <div>
+          <label style="color:var(--text-muted); display:block; margin-bottom:2px;">Nation</label>
+          <select onchange="updateSourceNation(${i}, this.value)" style="width:100%; background:#0d1117; border:1px solid var(--border); color:var(--text); padding:4px; border-radius:4px;">
+            ${NATIONS.map(n => `<option value="${n}" ${s.nation === n ? 'selected' : ''}>${n}</option>`).join('')}
+          </select>
+        </div>
+        <div>
+          <label style="color:var(--text-muted); display:block; margin-bottom:2px;">State</label>
+          <input type="text" value="${s.state || ''}" placeholder="Optional" onchange="updateSource(${i}, 'state', this.value)" style="width:100%; background:#0d1117; border:1px solid var(--border); color:var(--text); padding:4px; border-radius:4px;">
+        </div>
+      </div>
+      <div style="display:flex; align-items:center; gap:10px; margin-top:10px; font-size:0.8rem;">
+        <label style="display:flex; align-items:center; gap:6px; color:var(--text-secondary);">
+          <input type="checkbox" ${s.hasSuper ? 'checked' : ''} onchange="toggleSuper(${i}, this.checked)"> Superannuation
+        </label>
+        ${s.hasSuper ? `<span style="color:var(--text-muted);" ondblclick="editSuperRate(${i})" title="Double-click to edit">${s.superRate || SUPER_DEFAULTS[s.nation] || 12}%</span>` : ''}
+      </div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:8px; font-size:0.8rem;">
+        <div>
+          <label style="color:var(--text-muted); display:block; margin-bottom:2px;">Pay frequency</label>
+          <select onchange="updateSource(${i}, 'payFreq', this.value)" style="width:100%; background:#0d1117; border:1px solid var(--border); color:var(--text); padding:4px; border-radius:4px;">
+            <option value="weekly" ${s.payFreq === 'weekly' ? 'selected' : ''}>Weekly</option>
+            <option value="fortnightly" ${s.payFreq === 'fortnightly' ? 'selected' : ''}>Fortnightly</option>
+            <option value="monthly" ${s.payFreq === 'monthly' ? 'selected' : ''}>Monthly</option>
+          </select>
+        </div>
+        <div>
+          <label style="color:var(--text-muted); display:block; margin-bottom:2px;">Pay day</label>
+          <input type="number" min="1" max="31" value="${s.payDay || 15}" onchange="updateSource(${i}, 'payDay', parseInt(this.value)||1)" style="width:100%; background:#0d1117; border:1px solid var(--border); color:var(--text); padding:4px; border-radius:4px;" title="Day of month or week">
+        </div>
+      </div>
+    </div>
+  `).join("");
+  renderSourceMenu();
+  updateSuperDisplay();
+}
+function updateSourceNation(idx, nation) {
+  incomeSources[idx].nation = nation;
+  if (incomeSources[idx].hasSuper && !incomeSources[idx].superRateEdited) {
+    incomeSources[idx].superRate = SUPER_DEFAULTS[nation] || 12;
+  }
+  scheduleSave();
+  renderIncomeSources();
+}
+function toggleSuper(idx, on) {
+  incomeSources[idx].hasSuper = on;
+  if (on && !incomeSources[idx].superRate) {
+    incomeSources[idx].superRate = SUPER_DEFAULTS[incomeSources[idx].nation] || 12;
+  }
+  scheduleSave();
+  renderIncomeSources();
+}
+function editSuperRate(idx) {
+  const rate = prompt("Super rate %", incomeSources[idx].superRate || 12);
+  if (rate !== null) {
+    incomeSources[idx].superRate = parseFloat(rate) || 12;
+    incomeSources[idx].superRateEdited = true;
+    scheduleSave();
+    renderIncomeSources();
+  }
+}
+function updateSuperDisplay() {
+  const annualGross = parseFloat(document.getElementById("grossSalaryTop").value) || 0;
+  let superTotal = 0;
+  incomeSources.forEach(s => {
+    if (s.included && s.hasSuper) {
+      const rate = (s.superRate || SUPER_DEFAULTS[s.nation] || 12) / 100;
+      if (s.isMain) {
+        superTotal += annualGross * rate;
+      } else {
+        superTotal += (s.amount || 0) * 12 * rate;
+      }
+    }
+  });
+  const el = document.getElementById("superDisplay");
+  const remEl = document.getElementById("totalRemDisplay");
+  if (el) el.textContent = superTotal > 0 ? "+ $" + Math.round(superTotal).toLocaleString() + " super" : "";
+  if (remEl) remEl.textContent = superTotal > 0 ? "($" + Math.round(annualGross + superTotal).toLocaleString() + " total remuneration)" : "";
+}
+function renderSourceMenu() {
+  const menu = document.getElementById("sourceMenu");
+  menu.innerHTML = incomeSources.map((s, i) => `
+    <label><input type="checkbox" ${s.included ? "checked" : ""} onchange="toggleSource(${i}, this.checked)"> ${s.label}</label>
+  `).join("");
+}
+function toggleSourceDropdown() {
+  document.getElementById("sourceDropdown").classList.toggle("open");
+}
+function toggleSource(idx, included) {
+  incomeSources[idx].included = included;
+  scheduleSave();
+  renderIncomeSources();
+  syncMainIncome();
+}
+function updateSource(idx, field, value) {
+  incomeSources[idx][field] = value;
+  if (incomeSources[idx].isMain && field === "amount") {
+    document.getElementById("income").value = value;
+    updateDisplays();
+  updateSuperDisplay();
+  }
+  scheduleSave();
+  renderIncomeSources();
+}
+function addIncomeSource() {
+  incomeSources.push({ id: Date.now().toString(), label: "Other income", amount: 0, included: true, isMain: false });
+  scheduleSave();
+  renderIncomeSources();
+}
+function removeSource(idx) {
+  if (incomeSources[idx].isMain) return;
+  incomeSources.splice(idx, 1);
+  scheduleSave();
+  renderIncomeSources();
+}
+function syncMainIncome() {
+  const main = incomeSources.find(s => s.isMain);
+  if (main) {
+    main.amount = parseFloat(document.getElementById("income").value) || 0;
+  }
+}
+function getIncludedIncome() {
+  return incomeSources.filter(s => s.included).reduce((sum, s) => sum + (Number(s.amount) || 0), 0);
+}
+
+
+function renderYTD() {
+  const keys = Object.keys(periods).sort();
+  if (keys.length === 0) return;
+  
+  let totalIncome = 0, totalExpenses = 0, totalSavings = 0, totalPurchases = 0;
+  const monthlyData = [];
+  
+  keys.forEach(key => {
+    const p = periods[key];
+    if (!p) return;
+    const income = p.income || 0;
+    const phone = p.phoneAllowance || 0;
+    const spendable = income + phone;
+    let expDaily = 0;
+    (p.expenses || []).forEach(e => { expDaily += toDaily(e.amount, e.frequency); });
+    const expMonth = project(expDaily, "month");
+    const savings = p.savings || 0;
+    const purchases = (p.purchases || []).reduce((s, x) => s + (x.amount || 0), 0);
+    
+    totalIncome += spendable;
+    totalExpenses += expMonth;
+    totalSavings += savings;
+    totalPurchases += purchases;
+    monthlyData.push({ key, income: spendable, expenses: expMonth, savings, leftover: spendable - expMonth - savings });
+  });
+  
+  const leftover = totalIncome - totalExpenses - totalSavings - totalPurchases;
+  const avgIncome = totalIncome / keys.length;
+  const avgExpenses = totalExpenses / keys.length;
+  
+  document.getElementById("ytdSummary").innerHTML = `
+    <div class="stat"><div class="label">YTD Income</div><div class="value">${money(totalIncome)}</div></div>
+    <div class="stat"><div class="label">YTD Expenses</div><div class="value">${money(totalExpenses)}</div></div>
+    <div class="stat"><div class="label">YTD Savings</div><div class="value">${money(totalSavings)}</div></div>
+    <div class="stat"><div class="label">YTD Leftover</div><div class="value ${leftover >= 0 ? 'green' : 'red'}">${money(leftover)}</div></div>
+  `;
+  
+  const insights = [];
+  if (keys.length > 1) {
+    const last = monthlyData[monthlyData.length - 1];
+    const prev = monthlyData[monthlyData.length - 2];
+    if (last && prev) {
+      const expChange = ((last.expenses - prev.expenses) / prev.expenses * 100).toFixed(1);
+      insights.push(`Expenses ${expChange > 0 ? 'up' : 'down'} ${Math.abs(expChange)}% from last period`);
+    }
+  }
+  insights.push(`Average monthly income: ${money(avgIncome)}`);
+  insights.push(`Average monthly expenses: ${money(avgExpenses)}`);
+  if (totalSavings > 0) insights.push(`Savings rate: ${((totalSavings / totalIncome) * 100).toFixed(1)}%`);
+  
+  const rate = totalIncome > 0 ? (totalSavings / totalIncome) * 100 : 0;
+  const burn = avgIncome > 0 ? (avgExpenses / avgIncome) * 100 : 0;
+  let changeText = "Not enough history yet";
+  let changeFig = "—";
+  let changeColor = "blue";
+  if (keys.length > 1 && monthlyData.length > 1) {
+    const last = monthlyData[monthlyData.length - 1];
+    const prev = monthlyData[monthlyData.length - 2];
+    if (prev && prev.expenses) {
+      const expChange = ((last.expenses - prev.expenses) / prev.expenses) * 100;
+      changeFig = (expChange > 0 ? "+" : "") + expChange.toFixed(1) + "%";
+      changeText = "Expense change versus the previous period";
+      changeColor = expChange > 2 ? "orange" : expChange < -2 ? "green" : "blue";
+    }
+  }
+  const byCat = {};
+  expenses.forEach(e => {
+    const cat = e.categoryOverride ? (CATEGORIES[e.categoryOverride] || detectCategory(e.name)) : detectCategory(e.name);
+    byCat[cat.label] = (byCat[cat.label] || 0) + project(toDaily(e.amount, e.frequency), "month");
+  });
+  const topCat = Object.entries(byCat).sort((a, b) => b[1] - a[1])[0];
+  const paid = expenses.filter(e => e.paid).length;
+  const goal = parseFloat(document.getElementById("savingsGoal").value) || 0;
+  const balance = parseFloat(document.getElementById("savingsBalance").value) || 0;
+  const monthlySave = parseFloat(document.getElementById("savingsAmount").value) || 0;
+  const monthsLeft = monthlySave > 0 ? Math.max(0, Math.ceil((goal - balance) / monthlySave)) : null;
+  const icon = (d) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${d}</svg>`;
+  const insightCards = [
+    { color: rate >= 15 ? "green" : "orange", kicker: "Savings rate", figure: rate.toFixed(1) + "%", text: "Share of recorded income set aside", icon: icon('<polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/>') },
+    { color: burn > 90 ? "red" : burn > 70 ? "orange" : "blue", kicker: "Spend ratio", figure: burn.toFixed(0) + "%", text: "Average expenses against average income", icon: icon('<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>') },
+    { color: changeColor, kicker: "Period shift", figure: changeFig, text: changeText, icon: icon('<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>') },
+    { color: "blue", kicker: "Largest category", figure: topCat ? topCat[0] : "—", text: topCat ? money(topCat[1]) + " this period" : "No expenses yet", icon: icon('<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>') },
+    { color: paid === expenses.length && expenses.length ? "green" : "orange", kicker: "Paid", figure: expenses.length ? paid + " / " + expenses.length : "—", text: "Expenses marked paid this period", icon: icon('<polyline points="20 6 9 17 4 12"/>') },
+    { color: "green", kicker: "Goal", figure: monthsLeft == null ? "—" : monthsLeft + " mo", text: goal ? money(Math.max(0, goal - balance)) + " still to save" : "Set a savings goal", icon: icon('<line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>') }
+  ];
+  document.getElementById("ytdInsights").innerHTML = `
+    <div class="insight-cards">
+      ${insightCards.map((c, i) => `<div class="insight-card ${c.color}" style="animation-delay:${i * 70}ms"><div class="icon">${c.icon}</div><div class="insight-copy"><div class="kicker">${c.kicker}</div><div class="figure">${c.figure}</div><div class="text">${c.text}</div></div></div>`).join("")}
+    </div>
+  `;
+}
+
+function render() {
+  updateDisplays();
+  updateSuperDisplay();
+  const income = getIncludedIncome() || parseFloat(document.getElementById("income").value) || 0;
+  const phone = parseFloat(document.getElementById("phoneAllowance").value) || 0;
+  const spendable = income + phone;
+  const savings = parseFloat(document.getElementById("savingsAmount").value) || 0;
+  const incomeDaily = toDaily(income, "month");
+  const savingsDaily = toDaily(savings, "month");
+
+  let totalDaily = 0;
+  expenses.forEach(e => { totalDaily += toDaily(e.amount, e.frequency); });
+
+  const expMonth = project(totalDaily, "month");
+  const leftoverMonth = spendable - expMonth - savings;
+
+  document.getElementById("sumIncome").textContent = money(spendable);
+  document.getElementById("sumExpenses").textContent = money(expMonth);
+  document.getElementById("sumSavings").textContent = money(savings);
+  const leftEl = document.getElementById("sumLeftover");
+  leftEl.textContent = money(leftoverMonth);
+  leftEl.className = "value " + (leftoverMonth >= 0 ? "green" : "red");
+
+  // Sections by frequency
+  const container = document.getElementById("expenseSections");
+  container.innerHTML = "";
+  FREQS.forEach(freq => {
+    const group = expenses.filter(e => e.frequency === freq);
+    const section = document.createElement("div");
+    section.className = "section";
+    section.id = "sec-" + freq;
+    section.innerHTML = `
+      <div class="section-header collapsible-header" onclick="toggleSection('sec-${freq}')">
+        <h3>${FREQ_LABELS[freq]} expenses</h3>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <button class="btn small" onclick="event.stopPropagation(); addExpense('${freq}')">+ Add</button>
+          <span class="collapse-icon">−</span>
+        </div>
+      </div>
+      <div class="col-headers">
+        <span></span><span>Name</span><span>Category</span><span>Amount</span>
+        <span>Day</span><span>Week</span><span>Month</span><span>Year</span><span></span>
+      </div>
+      <div class="collapsible-body"><div class="section-body" id="group-${freq}"></div></div>
+    `;
+    container.appendChild(section);
+    const body = section.querySelector(".section-body");
+    group.forEach((e, idx) => {
+      const globalIdx = expenses.indexOf(e);
+      const daily = toDaily(e.amount, e.frequency);
+      const row = document.createElement("div");
+      row.className = "expense-row";
+      const cat = e.categoryOverride ? (CATEGORIES[e.categoryOverride] || detectCategory(e.name)) : detectCategory(e.name);
+      if (e.paid) row.classList.add("paid");
+      row.innerHTML = `
+        <div class="exp-icon" title="${cat.label} (double-click to change)" ondblclick="openCategoryPicker(${globalIdx})" style="cursor:pointer;">${cat.icon}</div>
+        <input type="text" value="${e.name}" onchange="updateExpense(${globalIdx}, 'name', this.value)">
+        <div class="paid-check ${e.paid ? 'checked' : ''}" onclick="togglePaid(${globalIdx})" title="Mark as paid">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+        </div>
+        <span class="cat-label" ondblclick="openCategoryPicker(${globalIdx})" style="cursor:pointer;" title="Double-click to change">${cat.label}</span>
+        <input type="number" step="0.01" value="${e.amount}" onchange="updateExpense(${globalIdx}, 'amount', parseFloat(this.value)||0)">
+        <span class="proj ${freq === 'day' ? 'base' : ''}">${money(project(daily, 'day'))}</span>
+        <span class="proj ${freq === 'week' ? 'base' : ''}">${money(project(daily, 'week'))}</span>
+        <span class="proj ${freq === 'month' ? 'base' : ''}">${money(project(daily, 'month'))}</span>
+        <span class="proj ${freq === 'year' ? 'base' : ''}">${money(project(daily, 'year'))}</span>
+        <button class="btn small" onclick="removeExpense(${globalIdx})" style="padding:4px 8px;">✕</button>
+      `;
+      body.appendChild(row);
+    });
+    if (group.length === 0) {
+      body.innerHTML = `<div style="padding:12px 16px; color:var(--text-muted); font-size:0.85rem;">No ${FREQ_LABELS[freq].toLowerCase()} expenses</div>`;
+    }
+  });
+
+  // Savings projections
+  const goal = parseFloat(document.getElementById("savingsGoal").value) || 0;
+  const balance = parseFloat(document.getElementById("savingsBalance").value) || 0;
+  const remaining = Math.max(0, goal - balance);
+  const monthsToGoal = savings > 0 ? Math.ceil(remaining / savings) : Infinity;
+  const projEl = document.getElementById("savingsProjections");
+  projEl.innerHTML = `
+    <div class="proj-card"><div class="label">Weekly</div><div class="value">${money(project(savingsDaily, 'week'))}</div></div>
+    <div class="proj-card"><div class="label">Monthly</div><div class="value">${money(savings)}</div></div>
+    <div class="proj-card"><div class="label">Yearly</div><div class="value">${money(project(savingsDaily, 'year'))}</div></div>
+    <div class="proj-card"><div class="label">Months to goal</div><div class="value">${isFinite(monthsToGoal) ? monthsToGoal : "—"}</div></div>
+  `;
+
+  updateCharts(expenses, income, savings, leftoverMonth);
+  renderPurchases();
+  updatePurchaseSubtext();
+  renderYTD();
+}
+
+function shadeHex(hex, amt) {
+  const n = String(hex).replace("#", "");
+  const full = n.length === 3 ? n.split("").map(c => c + c).join("") : n;
+  const num = parseInt(full, 16);
+  const clamp = (v) => Math.max(0, Math.min(255, v));
+  const r = clamp((num >> 16) + amt), g = clamp(((num >> 8) & 255) + amt), b = clamp((num & 255) + amt);
+  return "#" + ((r << 16) | (g << 8) | b).toString(16).padStart(6, "0");
+}
+const doughnutDepth = {
+  id: "doughnutDepth",
+  beforeDatasetsDraw(chart) {
+    const meta = chart.getDatasetMeta(0);
+    const ctx = chart.ctx;
+    const layers = 12;
+    for (let i = layers; i >= 1; i--) {
+      const t = i / layers;
+      meta.data.forEach(arc => {
+        const p = arc.getProps(["x", "y", "startAngle", "endAngle", "innerRadius", "outerRadius"], true);
+        ctx.save();
+        ctx.translate(5 * t, 12 * t);
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.outerRadius, p.startAngle, p.endAngle);
+        ctx.arc(p.x, p.y, Math.max(0, p.innerRadius - 0.5), p.endAngle, p.startAngle, true);
+        ctx.closePath();
+        const shade = Math.round(6 + (1 - t) * 22);
+        ctx.fillStyle = "rgba(" + shade + "," + (shade + 6) + "," + (shade + 14) + "," + (0.22 + t * 0.38) + ")";
+        ctx.fill();
+        ctx.restore();
+      });
+    }
+  }
+};
+const barDepth = {
+  id: "barDepth",
+  beforeDatasetsDraw(chart) {
+    if (chart.options.indexAxis === "y") return;
+    const meta = chart.getDatasetMeta(0);
+    const ctx = chart.ctx;
+    meta.data.forEach(bar => {
+      const p = bar.getProps(["x", "y", "base", "width"], true);
+      if (p.width == null || p.base == null) return;
+      const top = Math.min(p.y, p.base);
+      const bot = Math.max(p.y, p.base);
+      const d = 8;
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(p.x - p.width / 2, top);
+      ctx.lineTo(p.x - p.width / 2 + d, top - d);
+      ctx.lineTo(p.x + p.width / 2 + d, top - d);
+      ctx.lineTo(p.x + p.width / 2, top);
+      ctx.closePath();
+      const cap = ctx.createLinearGradient(0, top - d, 0, top);
+      cap.addColorStop(0, "rgba(255,255,255,0.34)");
+      cap.addColorStop(1, "rgba(255,255,255,0.05)");
+      ctx.fillStyle = cap;
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(p.x + p.width / 2, top);
+      ctx.lineTo(p.x + p.width / 2 + d, top - d);
+      ctx.lineTo(p.x + p.width / 2 + d, bot - 1);
+      ctx.lineTo(p.x + p.width / 2, bot);
+      ctx.closePath();
+      const side = ctx.createLinearGradient(p.x, 0, p.x + d, 0);
+      side.addColorStop(0, "rgba(0,0,0,0.18)");
+      side.addColorStop(1, "rgba(0,0,0,0.42)");
+      ctx.fillStyle = side;
+      ctx.fill();
+      ctx.restore();
+    });
+  }
+};
+function verticalGradient(chart, hex) {
+  const area = chart.chartArea;
+  if (!area) return hex;
+  const g = chart.ctx.createLinearGradient(0, area.top, 0, area.bottom);
+  g.addColorStop(0, shadeHex(hex, 28));
+  g.addColorStop(0.45, hex);
+  g.addColorStop(1, shadeHex(hex, -62));
+  return g;
+}
+function horizontalGradient(chart, hex) {
+  const area = chart.chartArea;
+  if (!area) return hex;
+  const g = chart.ctx.createLinearGradient(area.left, 0, area.right, 0);
+  g.addColorStop(0, shadeHex(hex, -36));
+  g.addColorStop(1, shadeHex(hex, 18));
+  return g;
+}
+const chartTip = {
+  backgroundColor: "rgba(10,14,20,.94)",
+  borderColor: "rgba(186,206,230,.22)",
+  borderWidth: 1,
+  padding: 10,
+  cornerRadius: 10,
+  titleColor: "#f4f7fb",
+  bodyColor: "#c5ced8",
+  titleFont: { family: "Blinker", size: 12, weight: "600" },
+  bodyFont: { family: "Blinker", size: 12 },
+  displayColors: true,
+  boxPadding: 4
+};
+
+function updateCharts(expenses, income, savings, leftover) {
+  const byFreq = {};
+  FREQS.forEach(f => byFreq[f] = 0);
+  const byCat = {};
+  expenses.forEach(e => {
+    const month = project(toDaily(e.amount, e.frequency), "month");
+    byFreq[e.frequency] = (byFreq[e.frequency] || 0) + month;
+    const cat = e.categoryOverride ? (CATEGORIES[e.categoryOverride] || detectCategory(e.name)) : detectCategory(e.name);
+    byCat[cat.label] = (byCat[cat.label] || 0) + month;
+  });
+
+  const pieLabels = Object.keys(byFreq).filter(k => byFreq[k] > 0).map(k => FREQ_LABELS[k]);
+  const pieValues = Object.keys(byFreq).filter(k => byFreq[k] > 0).map(k => byFreq[k]);
+  const palette = ["#7eb0ff", "#3dcc6e", "#f0a05a", "#c4b5fd", "#ff6b63", "#79c0ff", "#e6c15a", "#8b9cff"];
+  const expMonth = project(expenses.reduce((s, e) => s + toDaily(e.amount, e.frequency), 0), "month");
+  const barLabels = ["Income", "Expenses", "Savings", "Leftover"];
+  const barValues = [income, expMonth, savings, leftover];
+  const barColors = ["#7eb0ff", "#ff6b63", "#3dcc6e", leftover >= 0 ? "#3dcc6e" : "#ff6b63"];
+  const catEntries = Object.entries(byCat).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]).slice(0, 8);
+  const sig = JSON.stringify([pieValues.map(v => +v.toFixed(2)), barValues.map(v => +v.toFixed(2)), catEntries.map(([k, v]) => [k, +v.toFixed(2)])]);
+  const animate = sig !== lastChartSig;
+  lastChartSig = sig;
+  const anim = animate ? { duration: 1400, easing: "easeOutQuart", delay: (ctx) => ctx.type === "data" ? ctx.dataIndex * 80 : 0 } : false;
+  const legend = { position: "bottom", labels: { color: "#c5ced8", boxWidth: 10, padding: 10, font: { size: 11, family: "Blinker" } } };
+  const totalMonth = pieValues.reduce((s, v) => s + v, 0);
+
+  if (pieChart) pieChart.destroy();
+  if (barChart) barChart.destroy();
+  if (catChart) catChart.destroy();
+
+  pieChart = new Chart(document.getElementById("pieChart"), {
+    type: "doughnut",
+    data: { labels: pieLabels, datasets: [{ data: pieValues, backgroundColor: palette, hoverBackgroundColor: palette.map(c => shadeHex(c, 28)), borderColor: "#0c1016", borderWidth: 3, spacing: 3, borderRadius: 7, hoverOffset: 18 }] },
+    plugins: [doughnutDepth, {
+      id: "pieCenter",
+      afterDraw(chart) {
+        const meta = chart.getDatasetMeta(0);
+        if (!meta.data[0]) return;
+        const { x, y } = meta.data[0];
+        const ctx = chart.ctx;
+        ctx.save();
+        ctx.textAlign = "center";
+        ctx.fillStyle = "#f4f7fb";
+        ctx.font = "700 15px 'Source Sans 3', sans-serif";
+        ctx.fillText("$" + Math.round(totalMonth).toLocaleString(), x, y - 2);
+        ctx.fillStyle = "#8b97a6";
+        ctx.font = "600 10px Blinker, sans-serif";
+        ctx.fillText("PER MONTH", x, y + 14);
+        ctx.restore();
+      }
+    }],
+    options: {
+      cutout: "66%",
+      animation: anim,
+      layout: { padding: { top: 14, right: 18, bottom: 4, left: 8 } },
+      plugins: { legend, tooltip: Object.assign({}, chartTip, { callbacks: { label: (c) => " " + c.label + "  $" + Number(c.raw).toFixed(2) } }) }
+    }
+  });
+
+  barChart = new Chart(document.getElementById("barChart"), {
+    type: "bar",
+    data: {
+      labels: barLabels,
+      datasets: [{
+        data: barValues,
+        borderRadius: 10,
+        borderSkipped: false,
+        barPercentage: 0.62,
+        backgroundColor: (c) => verticalGradient(c.chart, barColors[c.dataIndex]),
+        hoverBackgroundColor: barColors.map(c => shadeHex(c, 24))
+      }]
+    },
+    plugins: [barDepth],
+    options: {
+      animation: anim,
+      layout: { padding: { top: 16, right: 18, bottom: 0, left: 0 } },
+      plugins: { legend: { display: false }, tooltip: Object.assign({}, chartTip, { callbacks: { label: (c) => " $" + Number(c.raw).toFixed(2) } }) },
+      scales: {
+        x: { ticks: { color: "#8b97a6", font: { size: 11, family: "Blinker" } }, grid: { display: false } },
+        y: { ticks: { color: "#8b97a6", font: { size: 10 } }, grid: { color: "rgba(176,196,220,0.08)" }, border: { display: false } }
+      }
+    }
+  });
+
+  catChart = new Chart(document.getElementById("catChart"), {
+    type: "bar",
+    data: {
+      labels: catEntries.map(([k]) => k),
+      datasets: [{
+        data: catEntries.map(([, v]) => v),
+        borderRadius: 8,
+        borderSkipped: false,
+        barPercentage: 0.72,
+        backgroundColor: (c) => horizontalGradient(c.chart, palette[c.dataIndex % palette.length]),
+        hoverBackgroundColor: catEntries.map((_, i) => shadeHex(palette[i % palette.length], 28))
+      }]
+    },
+    options: {
+      indexAxis: "y",
+      animation: anim,
+      plugins: { legend: { display: false }, tooltip: Object.assign({}, chartTip, { callbacks: { label: (c) => " $" + Number(c.raw).toFixed(2) + " / mo" } }) },
+      scales: {
+        x: { ticks: { color: "#8b97a6", font: { size: 10 } }, grid: { color: "rgba(176,196,220,0.08)" }, border: { display: false } },
+        y: { ticks: { color: "#c5ced8", font: { size: 11, family: "Blinker" } }, grid: { display: false } }
+      }
+    }
+  });
+}
+
+let pickerIdx = -1;
+
+let purchasePickerIdx = -1;
+function openPurchaseCategoryPicker(idx) {
+  purchasePickerIdx = idx;
+  const modal = document.getElementById("categoryPicker");
+  const grid = document.getElementById("categoryPickerGrid");
+  grid.innerHTML = Object.entries(CATEGORIES).map(([key, cat]) => `
+    <div class="picker-item" onclick="selectPurchaseCategory('${key}')">
+      <div class="picker-icon">${cat.icon}</div>
+      <span>${cat.label}</span>
+    </div>
+  `).join("");
+  modal.classList.add("active");
+}
+function selectPurchaseCategory(key) {
+  if (purchasePickerIdx >= 0) {
+    purchases[purchasePickerIdx].categoryOverride = key;
+    scheduleSave();
+    renderPurchases();
+  }
+  document.getElementById("categoryPicker").classList.remove("active");
+}
+
+function openCategoryPicker(idx) {
+  pickerIdx = idx;
+  const modal = document.getElementById("categoryPicker");
+  const grid = document.getElementById("categoryPickerGrid");
+  grid.innerHTML = Object.entries(CATEGORIES).map(([key, cat]) => `
+    <div class="picker-item" onclick="selectCategory('${key}')">
+      <div class="picker-icon">${cat.icon}</div>
+      <span>${cat.label}</span>
+    </div>
+  `).join("");
+  modal.classList.add("active");
+}
+function selectCategory(key) {
+  if (pickerIdx >= 0) {
+    expenses[pickerIdx].categoryOverride = key;
+    scheduleSave();
+    render();
+  }
+  document.getElementById("categoryPicker").classList.remove("active");
+}
+function closeCategoryPicker() {
+  document.getElementById("categoryPicker").classList.remove("active");
+}
+
+function togglePaid(idx) {
+  expenses[idx].paid = !expenses[idx].paid;
+  scheduleSave();
+  render();
+}
+
+function addExpense(freq) {
+  expenses.push({ name: "New expense", frequency: freq, amount: 0 });
+  scheduleSave();
+  render();
+}
+function updateExpense(idx, field, value) {
+  expenses[idx][field] = value;
+  scheduleSave();
+  render();
+}
+function removeExpense(idx) {
+  expenses.splice(idx, 1);
+  scheduleSave();
+  render();
+}
+
+function scheduleSave() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(saveRemote, 800);
+}
+
+async function saveRemote() {
+  savePeriod();
+  const payload = {
+    interval: budgetInterval,
+    periods,
+    income: parseFloat(document.getElementById("income").value) || 0,
+    grossSalary: parseFloat(document.getElementById("grossSalary").value) || 90000,
+    phoneAllowance: parseFloat(document.getElementById("phoneAllowance").value) || 44,
+    superRate: parseFloat(document.getElementById("superRate").value) || 12,
+    hasHelp: document.getElementById("hasHelp").value === "1",
+    savings: parseFloat(document.getElementById("savingsAmount").value) || 0,
+    savingsGoal: parseFloat(document.getElementById("savingsGoal").value) || 0,
+    savingsBalance: parseFloat(document.getElementById("savingsBalance").value) || 0,
+    expenses,
+    purchases,
+    incomeSources
+  };
+  document.getElementById("syncStatus").textContent = "Saving…";
+  try {
+    const res = await fetch("/api/budget", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    document.getElementById("syncStatus").textContent = res.ok ? "Synced" : "Local only";
+  } catch {
+    document.getElementById("syncStatus").textContent = "Local only";
+  }
+  localStorage.setItem("budget_local", JSON.stringify(payload));
+}
+
+async function loadRemote() {
+  try {
+    const res = await fetch("/api/budget", { credentials: "same-origin", cache: "no-store" });
+    if (res.status === 401) {
+      window.location.href = "/budget?login=1";
+      return false;
+    }
+    if (!res.ok) return false;
+    const json = await res.json();
+    if (json.data) {
+      if (json.data.periods) {
+        periods = json.data.periods;
+        budgetInterval = json.data.interval || "month";
+        const key = getPeriodKey(new Date(), budgetInterval);
+        loadPeriod(key);
+        return true;
+      }
+      document.getElementById("income").value = json.data.income ?? 5888;
+      if (json.data.grossSalary) {
+        document.getElementById("grossSalary").value = json.data.grossSalary;
+        document.getElementById("grossSalaryTop").value = json.data.grossSalary;
+      }
+      if (json.data.phoneAllowance) document.getElementById("phoneAllowance").value = json.data.phoneAllowance;
+      if (json.data.superRate) document.getElementById("superRate").value = json.data.superRate;
+      if (json.data.hasHelp) document.getElementById("hasHelp").value = "1";
+      document.getElementById("savingsAmount").value = json.data.savings ?? 850;
+      document.getElementById("savingsGoal").value = json.data.savingsGoal ?? 10000;
+      document.getElementById("savingsBalance").value = json.data.savingsBalance ?? 0;
+      expenses = json.data.expenses || DEFAULT_EXPENSES;
+      purchases = json.data.purchases || [];
+      if (json.data.incomeSources) incomeSources = json.data.incomeSources;
+      return true;
+    }
+  } catch (e) { console.warn(e); }
+  return false;
+}
+
+function loadLocal() {
+  try {
+    const raw = localStorage.getItem("budget_local");
+    if (raw) {
+      const d = JSON.parse(raw);
+      document.getElementById("income").value = d.income ?? 5888;
+      if (d.grossSalary) {
+        document.getElementById("grossSalary").value = d.grossSalary;
+        document.getElementById("grossSalaryTop").value = d.grossSalary;
+      }
+      if (d.phoneAllowance) document.getElementById("phoneAllowance").value = d.phoneAllowance;
+      if (d.superRate) document.getElementById("superRate").value = d.superRate;
+      if (d.hasHelp) document.getElementById("hasHelp").value = "1";
+      document.getElementById("savingsAmount").value = d.savings ?? 850;
+      document.getElementById("savingsGoal").value = d.savingsGoal ?? 10000;
+      document.getElementById("savingsBalance").value = d.savingsBalance ?? 0;
+      expenses = d.expenses || DEFAULT_EXPENSES;
+      purchases = d.purchases || [];
+      if (d.incomeSources) incomeSources = d.incomeSources;
+    } else {
+      expenses = JSON.parse(JSON.stringify(DEFAULT_EXPENSES));
+    }
+  } catch {
+    expenses = JSON.parse(JSON.stringify(DEFAULT_EXPENSES));
+  }
+}
+
+async function forceRefresh() {
+  const ok = await loadRemote();
+  document.getElementById("syncStatus").textContent = ok ? "Synced from server" : "Could not reach server";
+  render();
+}
+async function forcePush() {
+  await saveRemote();
+}
+
+function exportJSON() {
+  const data = {
+    income: parseFloat(document.getElementById("income").value) || 0,
+    savings: parseFloat(document.getElementById("savingsAmount").value) || 0,
+    savingsGoal: parseFloat(document.getElementById("savingsGoal").value) || 0,
+    savingsBalance: parseFloat(document.getElementById("savingsBalance").value) || 0,
+    expenses,
+    purchases,
+    incomeSources
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "budget-daniel-clancy.json";
+  a.click();
+}
+
+function importJSON(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  if (!confirm("Replace entire budget with imported data?")) { e.target.value = ""; return; }
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const d = JSON.parse(reader.result);
+      document.getElementById("income").value = d.income ?? 5888;
+      if (d.grossSalary) {
+        document.getElementById("grossSalary").value = d.grossSalary;
+        document.getElementById("grossSalaryTop").value = d.grossSalary;
+      }
+      if (d.phoneAllowance) document.getElementById("phoneAllowance").value = d.phoneAllowance;
+      if (d.superRate) document.getElementById("superRate").value = d.superRate;
+      if (d.hasHelp) document.getElementById("hasHelp").value = "1";
+      document.getElementById("savingsAmount").value = d.savings ?? 850;
+      document.getElementById("savingsGoal").value = d.savingsGoal ?? 10000;
+      document.getElementById("savingsBalance").value = d.savingsBalance ?? 0;
+      expenses = d.expenses || [];
+      scheduleSave();
+      render();
+    } catch { alert("Invalid JSON"); }
+    e.target.value = "";
+  };
+  reader.readAsText(file);
+}
+
+
+function exportPDF() {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: "mm", format: "a4" });
+  
+  const income = parseFloat(document.getElementById("income").value) || 0;
+  const phone = parseFloat(document.getElementById("phoneAllowance").value) || 0;
+  const gross = parseFloat(document.getElementById("grossSalaryTop").value) || 0;
+  const savings = parseFloat(document.getElementById("savingsAmount").value) || 0;
+  let totalDaily = 0;
+  expenses.forEach(e => { totalDaily += toDaily(e.amount, e.frequency); });
+  const expMonth = project(totalDaily, "month");
+  const leftover = income + phone - expMonth - savings;
+  const period = document.getElementById("periodTitle").textContent;
+
+  // Header
+  doc.setFillColor(16, 21, 28);
+  doc.rect(0, 0, 210, 28, "F");
+  doc.setTextColor(240, 243, 246);
+  doc.setFontSize(16);
+  doc.setFont("helvetica", "bold");
+  doc.text("Budget Ledger", 14, 14);
+  doc.setFontSize(10);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(176, 184, 196);
+  doc.text("Daniel Clancy  ·  " + period, 14, 22);
+
+  // Summary cards
+  doc.setTextColor(26, 26, 26);
+  const cards = [
+    { label: "Gross annual", value: "$" + gross.toLocaleString() },
+    { label: "Net monthly", value: "$" + income.toFixed(2) },
+    { label: "Expenses / month", value: "$" + expMonth.toFixed(2) },
+    { label: "Leftover / month", value: "$" + leftover.toFixed(2) }
+  ];
+  cards.forEach((c, i) => {
+    const x = 14 + i * 48;
+    doc.setFillColor(245, 245, 245);
+    doc.roundedRect(x, 36, 44, 18, 2, 2, "F");
+    doc.setFontSize(7);
+    doc.setTextColor(100, 100, 100);
+    doc.text(c.label.toUpperCase(), x + 3, 42);
+    doc.setFontSize(11);
+    doc.setTextColor(26, 26, 26);
+    doc.setFont("helvetica", "bold");
+    doc.text(c.value, x + 3, 50);
+    doc.setFont("helvetica", "normal");
+  });
+
+  // Table header
+  let y = 64;
+  doc.setFillColor(245, 245, 245);
+  doc.rect(14, y, 182, 8, "F");
+  doc.setFontSize(8);
+  doc.setTextColor(100, 100, 100);
+  doc.text("EXPENSE", 16, y + 5.5);
+  doc.text("CATEGORY", 60, y + 5.5);
+  doc.text("FREQ", 100, y + 5.5);
+  doc.text("AMOUNT", 130, y + 5.5);
+  doc.text("MONTHLY", 165, y + 5.5);
+
+  // Table rows
+  y += 10;
+  doc.setTextColor(26, 26, 26);
+  doc.setFontSize(9);
+  expenses.forEach(e => {
+    if (y > 270) { doc.addPage(); y = 20; }
+    const daily = toDaily(e.amount, e.frequency);
+    const cat = e.categoryOverride ? (CATEGORIES[e.categoryOverride] || detectCategory(e.name)) : detectCategory(e.name);
+    doc.text(e.name.substring(0, 24), 16, y);
+    doc.setTextColor(120, 120, 120);
+    doc.text(cat.label, 60, y);
+    doc.text(e.frequency, 100, y);
+    doc.setTextColor(26, 26, 26);
+    doc.text("$" + e.amount.toFixed(2), 130, y);
+    doc.text("$" + project(daily, "month").toFixed(2), 165, y);
+    y += 7;
+  });
+
+  // Footer
+  doc.setFontSize(8);
+  doc.setTextColor(150, 150, 150);
+  doc.text("Generated " + new Date().toLocaleDateString(), 14, 285);
+
+  doc.save("budget-" + period.replace(/\s+/g, "-").toLowerCase() + ".pdf");
+}
+
+function openShareModal() { document.getElementById("shareModal").classList.add("active"); }
+function closeShareModal() { document.getElementById("shareModal").classList.remove("active"); }
+
+async function generateShare() {
+  const payload = {
+    income: parseFloat(document.getElementById("income").value) || 0,
+    grossSalary: parseFloat(document.getElementById("grossSalary").value) || 90000,
+    phoneAllowance: parseFloat(document.getElementById("phoneAllowance").value) || 44,
+    superRate: parseFloat(document.getElementById("superRate").value) || 12,
+    hasHelp: document.getElementById("hasHelp").value === "1",
+    savings: parseFloat(document.getElementById("savingsAmount").value) || 0,
+    savingsGoal: parseFloat(document.getElementById("savingsGoal").value) || 0,
+    savingsBalance: parseFloat(document.getElementById("savingsBalance").value) || 0,
+    expenses,
+    purchases,
+    incomeSources,
+    periods,
+    expiry: document.getElementById("shareExpiry").value,
+    password: document.getElementById("sharePassword").checked
+  };
+  try {
+    const res = await fetch("/api/budget-share", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) throw new Error();
+    const data = await res.json();
+    document.getElementById("shareLink").value = `${location.origin}/budget/shared/${data.code}`;
+    document.getElementById("shareResult").style.display = "block";
+  } catch { alert("Could not generate share link"); }
+}
+
+function copyShareLink() {
+  navigator.clipboard.writeText(document.getElementById("shareLink").value);
+  const icon = document.getElementById("copyIcon");
+  const text = document.getElementById("copyText");
+  icon.innerHTML = '<polyline points="20 6 9 17 4 12"/>';
+  text.textContent = "Copied";
+  setTimeout(() => {
+    icon.innerHTML = '<rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>';
+    text.textContent = "Copy";
+  }, 2000);
+}
+function mailtoShare() {
+  const link = document.getElementById("shareLink").value;
+  const expiry = document.getElementById("shareExpiry").options[document.getElementById("shareExpiry").selectedIndex].text;
+  const subject = encodeURIComponent("Daniel Clancy has shared a budget report");
+  const body = encodeURIComponent(`Please find the budget report here:\n\n${link}\n\nThis link expires: ${expiry}.`);
+  window.location.href = `mailto:?subject=${subject}&body=${body}`;
+}
+
+function logout() {
+  document.cookie = "budget_auth=; Path=/; Max-Age=0; Secure; SameSite=Lax";
+  window.location.href = "/budget?login=1";
+}
+
+
+function toggleSection(id) {
+  const el = document.getElementById(id);
+  if (el) el.classList.toggle("collapsed");
+}
+
+function toggleSalary() {
+  const el = document.getElementById("salaryDetails");
+  const chev = document.getElementById("salaryChevron");
+  el.classList.toggle("open");
+  chev.textContent = el.classList.contains("open") ? "−" : "+";
+}
+
+function calcTax(income) {
+  // 2025-26 / 2026-27 resident rates (Stage 3)
+  if (income <= 18200) return 0;
+  if (income <= 45000) return (income - 18200) * 0.15;
+  if (income <= 135000) return 4020 + (income - 45000) * 0.30;
+  if (income <= 190000) return 31020 + (income - 135000) * 0.37;
+  return 51370 + (income - 190000) * 0.45;
+}
+
+function calcHelp(income) {
+  // Simplified HELP thresholds 2025-26
+  if (income < 54435) return 0;
+  if (income < 62850) return income * 0.01;
+  if (income < 66620) return income * 0.02;
+  if (income < 70618) return income * 0.025;
+  if (income < 74855) return income * 0.03;
+  if (income < 79346) return income * 0.035;
+  if (income < 84107) return income * 0.04;
+  if (income < 89154) return income * 0.045;
+  if (income < 94503) return income * 0.05;
+  if (income < 100174) return income * 0.055;
+  if (income < 106185) return income * 0.06;
+  if (income < 112556) return income * 0.065;
+  if (income < 119309) return income * 0.07;
+  if (income < 126467) return income * 0.075;
+  if (income < 134056) return income * 0.08;
+  if (income < 142100) return income * 0.085;
+  if (income < 150626) return income * 0.09;
+  if (income < 159663) return income * 0.095;
+  return income * 0.10;
+}
+
+function calcSalary() {
+  const gross = parseFloat(document.getElementById("grossSalary").value) || 0;
+  const superRate = (parseFloat(document.getElementById("superRate").value) || 12) / 100;
+  const hasHelp = document.getElementById("hasHelp").value === "1";
+
+  const tax = calcTax(gross);
+  const medicare = gross * 0.02;
+  const help = hasHelp ? calcHelp(gross) : 0;
+  const totalTax = tax + medicare + help;
+  const net = gross - totalTax;
+  const superAmt = gross * superRate;
+
+  document.getElementById("salaryBreakdown").innerHTML = `
+    <div class="salary-row"><span class="label">Gross salary</span><span class="value">${money(gross)}</span></div>
+    <div class="salary-row"><span class="label">Income tax</span><span class="value">-${money(tax)}</span></div>
+    <div class="salary-row"><span class="label">Medicare levy (2%)</span><span class="value">-${money(medicare)}</span></div>
+    ${hasHelp ? `<div class="salary-row"><span class="label">HELP repayment</span><span class="value">-${money(help)}</span></div>` : ""}
+    <div class="salary-row total"><span class="label">Net (take-home)</span><span class="value">${money(net)}</span></div>
+    <div class="salary-row"><span class="label">Super (employer)</span><span class="value">${money(superAmt)}</span></div>
+    <div class="salary-row"><span class="label">Total package</span><span class="value">${money(gross + superAmt)}</span></div>
+  `;
+
+  document.getElementById("payPeriods").innerHTML = `
+    <div class="salary-row"><span class="label">Weekly</span><span class="value">${money(net / 52)}</span></div>
+    <div class="salary-row"><span class="label">Fortnightly</span><span class="value">${money(net / 26)}</span></div>
+    <div class="salary-row"><span class="label">Monthly</span><span class="value">${money(net / 12)}</span></div>
+    <div class="salary-row total"><span class="label">Annually</span><span class="value">${money(net)}</span></div>
+  `;
+
+  // Super projections (simple compound at 7% assumed return)
+  const rate = 0.07;
+  let balance = 0;
+  let rows = "";
+  [1, 5, 10, 20, 30].forEach(years => {
+    // FV of annuity: superAmt * ((1+r)^n - 1) / r
+    const fv = superAmt * (Math.pow(1 + rate, years) - 1) / rate;
+    rows += `<tr><td>${years} year${years > 1 ? "s" : ""}</td><td>${money(fv)}</td></tr>`;
+  });
+  document.getElementById("superTable").innerHTML = `
+    <tr><th>Horizon</th><th>Projected balance</th></tr>
+    ${rows}
+    <tr><td colspan="2" style="font-size:0.75rem; color:var(--text-muted); text-align:left; padding-top:8px;">Assumes 7% annual return, employer contributions only, no fees.</td></tr>
+  `;
+
+  // Optionally sync net monthly to income field
+  // document.getElementById("income").value = (net / 12).toFixed(2);
+}
+
+
+
+function initSticky() {
+  const header = document.querySelector("header");
+  let ticking = false;
+  window.addEventListener("scroll", () => {
+    if (!ticking) {
+      requestAnimationFrame(() => {
+        header.classList.toggle("slim", window.scrollY > 60);
+        ticking = false;
+      });
+      ticking = true;
+    }
+  }, { passive: true });
+}
+
+
+
+function editSlim(which) {
+  const isGross = which === "gross";
+  const display = document.getElementById(isGross ? "slimGross" : "slimNet");
+  const input = document.getElementById(isGross ? "slimGrossInput" : "slimNetInput");
+  const mainInput = document.getElementById(isGross ? "grossSalaryTop" : "income");
+  input.value = mainInput.value;
+  display.style.display = "none";
+  input.style.display = "inline";
+  input.focus();
+  input.select();
+}
+function finishSlim(which) {
+  const isGross = which === "gross";
+  const display = document.getElementById(isGross ? "slimGross" : "slimNet");
+  const input = document.getElementById(isGross ? "slimGrossInput" : "slimNetInput");
+  const mainInput = document.getElementById(isGross ? "grossSalaryTop" : "income");
+  mainInput.value = input.value;
+  display.style.display = "inline";
+  input.style.display = "none";
+  if (isGross) syncGross();
+  updateDisplays();
+  updateSuperDisplay();
+  scheduleSave();
+  render();
+}
+
+function editField(which) {
+  const map = { gross: ["grossDisplay", "grossSalaryTop"], net: ["netDisplay", "income"], phone: ["phoneDisplay", "phoneAllowance"] };
+  const [dId, iId] = map[which] || map.net;
+  const display = document.getElementById(dId);
+  const input = document.getElementById(iId);
+  display.style.display = "none";
+  input.style.display = "block";
+  input.focus();
+  input.select();
+}
+function finishEdit(which) {
+  const map = { gross: ["grossDisplay", "grossSalaryTop"], net: ["netDisplay", "income"], phone: ["phoneDisplay", "phoneAllowance"] };
+  const [dId, iId] = map[which] || map.net;
+  const display = document.getElementById(dId);
+  const input = document.getElementById(iId);
+  const val = parseFloat(input.value) || 0;
+  display.style.display = "block";
+  input.style.display = "none";
+  
+  if (which === "gross") {
+    // Gross changed → calculate net
+    document.getElementById("grossSalary").value = val;
+    const netAnnual = calcNetFromGross(val);
+    const netMonthly = Math.round(netAnnual / 12 * 100) / 100;
+    document.getElementById("income").value = netMonthly;
+  }
+  if (which === "net") {
+    // Net changed → back-calculate gross
+    const grossAnnual = calcGrossFromNet(val * 12);
+    document.getElementById("grossSalaryTop").value = Math.round(grossAnnual);
+    document.getElementById("grossSalary").value = Math.round(grossAnnual);
+  }
+  
+  updateDisplays();
+  calcSalary();
+  updateSuperDisplay();
+  render();
+}
+
+function calcGrossFromNet(netAnnual) {
+  // Approximate reverse calculation
+  let gross = netAnnual / 0.7;
+  for (let i = 0; i < 10; i++) {
+    const calcNet = calcNetFromGross(gross);
+    const diff = netAnnual - calcNet;
+    if (Math.abs(diff) < 1) break;
+    gross += diff * 1.3;
+  }
+  return gross;
+}
+
+function calcNetFromGross(gross) {
+  // Australian tax calculation
+  const brackets = [
+    { min: 0, max: 18200, rate: 0 },
+    { min: 18200, max: 45000, rate: 0.16 },
+    { min: 45000, max: 135000, rate: 0.30 },
+    { min: 135000, max: 190000, rate: 0.37 },
+    { min: 190000, max: Infinity, rate: 0.45 }
+  ];
+  let tax = 0;
+  for (const b of brackets) {
+    if (gross > b.min) {
+      const taxable = Math.min(gross, b.max) - b.min;
+      tax += taxable * b.rate;
+    }
+  }
+  const medicare = gross * 0.02;
+  const superRate = (parseFloat(document.getElementById("superRate").value) || 12) / 100;
+  const superAmt = gross * superRate;
+  return gross - tax - medicare;
+}
+function updateDisplays() {
+  const g = parseFloat(document.getElementById("grossSalaryTop").value) || 0;
+  const n = parseFloat(document.getElementById("income").value) || 0;
+  const gStr = "$" + g.toLocaleString();
+  const nStr = money(n);
+  document.getElementById("grossDisplay").textContent = gStr;
+  document.getElementById("netDisplay").textContent = nStr;
+  const ph = parseFloat(document.getElementById("phoneAllowance").value) || 0;
+  const pd = document.getElementById("phoneDisplay");
+  if (pd) pd.textContent = money(ph);
+  const sg = document.getElementById("slimGross");
+  const sn = document.getElementById("slimNet");
+  if (sg) sg.textContent = gStr;
+  if (sn) sn.textContent = nStr;
+}
+
+function syncGross() {
+  const v = document.getElementById("grossSalaryTop").value;
+  document.getElementById("grossSalary").value = v;
+  calcSalary();
+}
+function syncGrossFromDetail() {
+  const v = document.getElementById("grossSalary").value;
+  document.getElementById("grossSalaryTop").value = v;
+}
+
+
+
+function renderIconEditor() {
+  const el = document.getElementById("iconEditor");
+  let html = "";
+  for (const [key, cat] of Object.entries(CATEGORIES)) {
+    const currentIcon = categoryIcons[key] || cat.icon;
+    html += `<div style="display:flex; align-items:center; gap:10px; padding:6px 8px; border-radius:6px; background:var(--bg-elevated);">
+      <div style="width:22px; height:22px; display:flex; align-items:center; justify-content:center; flex-shrink:0;">${currentIcon}</div>
+      <span style="flex:1; font-size:0.85rem;">${cat.label}</span>
+      <select onchange="setCategoryIcon('${key}', this.value)" style="background:#0d1117; border:1px solid var(--border); color:var(--text); padding:4px 8px; border-radius:4px; font-size:0.75rem;">
+        ${Object.keys(ICONS).map(ik => `<option value="${ik}" ${currentIcon === ICONS[ik] ? "selected" : ""}>${ik}</option>`).join("")}
+      </select>
+    </div>`;
+  }
+  el.innerHTML = html;
+}
+function setCategoryIcon(catKey, iconKey) {
+  categoryIcons[catKey] = ICONS[iconKey];
+  CATEGORIES[catKey].icon = ICONS[iconKey];
+  localStorage.setItem("budget_icons", JSON.stringify(categoryIcons));
+  renderIconEditor();
+  render();
+}
+
+
+function populateIconSelect() {
+  const sel = document.getElementById("newCatIcon");
+  if (!sel || sel.options.length) return;
+  for (const key of Object.keys(ICONS)) {
+    const opt = document.createElement("option");
+    opt.value = key;
+    opt.textContent = key;
+    sel.appendChild(opt);
+  }
+}
+function addCategory() {
+  const label = document.getElementById("newCatLabel").value.trim();
+  const iconKey = document.getElementById("newCatIcon").value;
+  if (!label) return;
+  const key = label.toLowerCase().replace(/\s+/g, "_");
+  if (CATEGORIES[key]) { alert("Category exists"); return; }
+  CATEGORIES[key] = { label, keywords: [label.toLowerCase()], icon: ICONS[iconKey] || ICONS.circle };
+  categoryIcons[key] = CATEGORIES[key].icon;
+  localStorage.setItem("budget_custom_cats", JSON.stringify(
+    Object.fromEntries(Object.entries(CATEGORIES).filter(([k]) => !["housing","transport","groceries","dining","fastfood","coffee","power","water","internet","phone","health","apple","microsoft","google","subscriptions","leisure","gambling","retail","cigarettes","other"].includes(k)))
+  ));
+  localStorage.setItem("budget_icons", JSON.stringify(categoryIcons));
+  document.getElementById("newCatLabel").value = "";
+  renderIconEditor();
+  render();
+}
+
+
+function openPeriodManager() {
+  const sel = document.getElementById("managerInterval");
+  if (sel) sel.value = budgetInterval;
+  renderPeriodList();
+  document.getElementById("periodManager").classList.add("active");
+}
+function closePeriodManager() {
+  document.getElementById("periodManager").classList.remove("active");
+}
+function renderPeriodList() {
+  const el = document.getElementById("periodList");
+  const keys = Object.keys(periods).sort().reverse();
+  if (keys.length === 0) {
+    el.innerHTML = '<div style="color:var(--text-muted); padding:12px;">No periods saved</div>';
+    return;
+  }
+  el.innerHTML = keys.map(key => {
+    const p = periods[key];
+    const isCurrent = key === currentPeriodKey;
+    return `<div style="display:flex; align-items:center; gap:10px; padding:10px 12px; background:var(--bg-elevated); border-radius:8px; margin-bottom:6px; ${isCurrent ? 'border:1px solid var(--accent);' : ''}">
+      <div style="flex:1;">
+        <div style="font-weight:600;">${formatPeriodTitle(key, budgetInterval)}</div>
+        <div style="font-size:0.75rem; color:var(--text-muted);">Income: $${(p.income || 0).toFixed(2)} · ${(p.expenses || []).length} expenses</div>
+      </div>
+      <button class="btn small" onclick="loadPeriodFromManager('${key}')">Open</button>
+      <button class="btn small" onclick="duplicatePeriod('${key}')" title="Duplicate">⧉</button>
+      <button class="btn small" onclick="deletePeriod('${key}')" style="color:var(--red);" ${isCurrent ? 'disabled' : ''}>✕</button>
+    </div>`;
+  }).join("");
+}
+function loadPeriodFromManager(key) {
+  savePeriod();
+  loadPeriod(key);
+  closePeriodManager();
+}
+function duplicatePeriod(key) {
+  const d = new Date();
+  d.setMonth(d.getMonth() + 1);
+  const newKey = getPeriodKey(d, budgetInterval);
+  if (periods[newKey]) {
+    alert("Period already exists");
+    return;
+  }
+  periods[newKey] = JSON.parse(JSON.stringify(periods[key]));
+  scheduleSave();
+  renderPeriodList();
+}
+function deletePeriod(key) {
+  if (key === currentPeriodKey) return;
+  if (!confirm("Delete " + formatPeriodTitle(key, budgetInterval) + "?")) return;
+  delete periods[key];
+  scheduleSave();
+  renderPeriodList();
+}
+function addPeriod() {
+  const dateInput = document.getElementById("newPeriodDate").value;
+  if (!dateInput) return;
+  const key = getPeriodKey(new Date(dateInput + "-01"), budgetInterval);
+  if (periods[key]) {
+    alert("Period already exists");
+    return;
+  }
+  ensurePeriod(key);
+  scheduleSave();
+  renderPeriodList();
+}
+
+function openSettings() {
+  populateIconSelect();
+  renderIconEditor();
+  renderRules();
+  document.getElementById("settingsModal").classList.add("active");
+}
+function closeSettings() {
+  document.getElementById("settingsModal").classList.remove("active");
+}
+function renderRules() {
+  const el = document.getElementById("rulesList");
+  let html = "";
+  for (const [cat, words] of Object.entries(customRules)) {
+    words.forEach((w, i) => {
+      html += `<div style="display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-bottom:1px solid var(--border);">
+        <span><strong>${CATEGORIES[cat]?.label || cat}</strong>: ${w}</span>
+        <button class="btn small" onclick="removeRule('${cat}', ${i})">✕</button>
+      </div>`;
+    });
+  }
+  el.innerHTML = html || '<div style="color:var(--text-muted); font-size:0.85rem;">No custom rules. Default matching is active.</div>';
+}
+function addRule() {
+  const cat = document.getElementById("newRuleCat").value;
+  const word = document.getElementById("newRuleWord").value.trim();
+  if (!word) return;
+  if (!customRules[cat]) customRules[cat] = [];
+  customRules[cat].push(word);
+  document.getElementById("newRuleWord").value = "";
+  localStorage.setItem("budget_rules", JSON.stringify(customRules));
+  renderRules();
+  render();
+}
+function removeRule(cat, idx) {
+  customRules[cat].splice(idx, 1);
+  if (customRules[cat].length === 0) delete customRules[cat];
+  localStorage.setItem("budget_rules", JSON.stringify(customRules));
+  renderRules();
+  render();
+}
+
+try { customRules = JSON.parse(localStorage.getItem("budget_rules") || "{}"); } catch {}
+try {
+  const custom = JSON.parse(localStorage.getItem("budget_custom_cats") || "{}");
+  Object.assign(CATEGORIES, custom);
+} catch {}
+try {
+  categoryIcons = JSON.parse(localStorage.getItem("budget_icons") || "{}");
+  for (const [k, v] of Object.entries(categoryIcons)) {
+    if (CATEGORIES[k]) CATEGORIES[k].icon = v;
+  }
+} catch {}
+
+function setDensity(mode) {
+  document.body.classList.remove("density-compact", "density-large");
+  if (mode === "compact") document.body.classList.add("density-compact");
+  if (mode === "large") document.body.classList.add("density-large");
+  document.querySelectorAll(".density-toggle button").forEach(b => {
+    b.classList.toggle("active", b.dataset.density === mode);
+  });
+  localStorage.setItem("budget_density", mode);
+}
+
+
+document.querySelectorAll(".modal-overlay").forEach(overlay => {
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay) overlay.classList.remove("active");
+  });
+});
+
+(async function init() {
+  document.getElementById("syncStatus").textContent = "Loading…";
+  const ok = await loadRemote();
+  if (!ok) {
+    loadLocal();
+    document.getElementById("syncStatus").textContent = "Using local data";
+  } else {
+    document.getElementById("syncStatus").textContent = "Synced from server";
+  }
+  const savedDensity = localStorage.getItem("budget_density") || "medium";
+  setDensity(savedDensity);
+  const interval = localStorage.getItem("budget_interval") || "month";
+  budgetInterval = interval;
+  const sel = document.getElementById("budgetInterval");
+  if (sel) sel.value = interval;
+  if (Object.keys(periods).length === 0) {
+    loadPeriod(getPeriodKey(new Date(), budgetInterval));
+  }
+  renderIncomeSources();
+  render();
+  calcSalary();
+  updatePeriodButtons();
+  initSticky();
+})();
+</script>
+
+
+<div class="density-toggle" id="densityToggle">
+  <button data-density="compact" onclick="setDensity('compact')" title="Compact">S</button>
+  <button data-density="medium" class="active" onclick="setDensity('medium')" title="Medium">M</button>
+  <button data-density="large" onclick="setDensity('large')" title="Large">L</button>
+  <button onclick="openSettings()" title="Settings" style="display:flex;align-items:center;padding:6px 10px;">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+  </button>
+</div>
+<button class="settings-btn" style="display:none;" onclick="openSettings()" title="Settings">
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+</button>
+
+<div class="modal-overlay" id="settingsModal">
+  <div class="modal" style="width:min(560px,92vw);">
+    <div class="modal-header">
+      <h2>Settings</h2>
+      <button class="btn" onclick="closeSettings()" style="padding:4px 8px;">&times;</button>
+    </div>
+    <div class="modal-body" style="max-height:60vh; overflow-y:auto;">
+      <h4 style="font-size:0.85rem; color:var(--text-muted); margin-bottom:10px;">Budget interval</h4>
+      <select id="budgetInterval" onchange="setInterval(this.value)" style="width:100%; background:#0d1117; border:1px solid var(--border); color:var(--text); padding:8px; border-radius:6px; margin-bottom:16px;">
+        <option value="month">Calendar month</option>
+        <option value="fortnight">Fortnight</option>
+        <option value="week">Week</option>
+        <option value="day">Day</option>
+      </select>
+      <h4 style="font-size:0.85rem; color:var(--text-muted); margin-bottom:10px;">Add category</h4>
+      <div style="display:flex; gap:8px; margin-bottom:16px;">
+        <input type="text" id="newCatLabel" placeholder="Category name" style="flex:1; background:#0d1117; border:1px solid var(--border); color:var(--text); padding:6px 10px; border-radius:6px;">
+        <select id="newCatIcon" style="background:#0d1117; border:1px solid var(--border); color:var(--text); padding:6px; border-radius:6px;">
+        </select>
+        <button class="btn" onclick="addCategory()">Add</button>
+      </div>
+      <h4 style="font-size:0.85rem; color:var(--text-muted); margin-bottom:10px;">Category icons</h4>
+      <div id="iconEditor" style="display:flex; flex-direction:column; gap:4px; margin-bottom:20px; max-height:280px; overflow-y:auto;"></div>
+      <h4 style="font-size:0.85rem; color:var(--text-muted); margin-bottom:10px;">Match rules</h4>
+      <p style="font-size:0.8rem; color:var(--text-secondary); margin-bottom:12px;">Add keywords that map to categories.</p>
+      <div id="rulesList"></div>
+      <div style="display:flex; gap:8px; margin-top:12px;">
+        <select id="newRuleCat" style="background:#0d1117; border:1px solid var(--border); color:var(--text); padding:6px; border-radius:6px;">
+          <option value="housing">Housing</option>
+          <option value="transport">Transport</option>
+          <option value="food">Food</option>
+          <option value="utilities">Utilities</option>
+          <option value="phone">Phone</option>
+          <option value="health">Health</option>
+          <option value="subscriptions">Subscriptions</option>
+          <option value="vice">Vice</option>
+        </select>
+        <input type="text" id="newRuleWord" placeholder="keyword" style="flex:1; background:#0d1117; border:1px solid var(--border); color:var(--text); padding:6px 10px; border-radius:6px;">
+        <button class="btn" onclick="addRule()">Add</button>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeSettings()">Close</button>
+    </div>
+  </div>
+</div>
+
+
+<div class="modal-overlay" id="incomeModal">
+  <div class="modal" style="width:min(680px,94vw); max-height:85vh;">
+    <div class="modal-header">
+      <h2>Income sources</h2>
+      <button class="btn" onclick="closeIncomeModal()" style="padding:4px 8px;">&times;</button>
+    </div>
+    <div class="modal-body" style="max-height:65vh; overflow-y:auto; padding:16px 20px;">
+      <div id="incomeSourcesList"></div>
+      <button class="btn" onclick="addIncomeSource()" style="margin-top:12px;">+ Add source</button>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeIncomeModal()">Close</button>
+    </div>
+  </div>
+</div>
+
+
+<div class="modal-overlay" id="categoryPicker">
+  <div class="modal" style="width:min(480px,92vw);">
+    <div class="modal-header">
+      <h2>Select category</h2>
+      <button class="btn" onclick="closeCategoryPicker()" style="padding:4px 8px;">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div id="categoryPickerGrid" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(80px, 1fr)); gap:8px;"></div>
+    </div>
+  </div>
+</div>
+
+
+<div class="modal-overlay" id="periodManager">
+  <div class="modal" style="width:min(560px,94vw);">
+    <div class="modal-header">
+      <h2>Manage periods</h2>
+      <button class="btn" onclick="closePeriodManager()" style="padding:4px 8px;">&times;</button>
+    </div>
+    <div class="modal-body" style="max-height:60vh; overflow-y:auto;">
+      <div id="periodList"></div>
+      <div style="margin-bottom:16px;">
+        <label style="font-size:0.8rem; color:var(--text-muted); display:block; margin-bottom:4px;">Budget interval</label>
+        <select id="managerInterval" onchange="setInterval(this.value)" style="width:100%; background:#0d1117; border:1px solid var(--border); color:var(--text); padding:8px; border-radius:6px;">
+          <option value="month">Calendar month</option>
+          <option value="fortnight">Fortnight</option>
+          <option value="week">Week</option>
+          <option value="day">Day</option>
+        </select>
+      </div>
+      <div style="display:flex; gap:8px; margin-top:16px;">
+        <input type="month" id="newPeriodDate" style="background:#0d1117; border:1px solid var(--border); color:var(--text); padding:6px 10px; border-radius:6px;">
+        <button class="btn" onclick="addPeriod()">+ Add period</button>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closePeriodManager()">Close</button>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
