@@ -159,6 +159,7 @@ const PAGE_CSS = `
   .chart-card:hover { border-color: rgba(196,214,236,.32); }
   .chart-stage { position: relative; height: 250px; display: flex; align-items: center; justify-content: center; }
   .chart-stage.bars, .chart-stage.tall { display: block; height: 260px; }
+  .chart-stage.line { height: 280px; }
   .chart-stage canvas,
   .chart-stage.bars canvas,
   .chart-card:hover canvas,
@@ -272,10 +273,26 @@ const CHART_BOOT = `
     g.addColorStop(0, shadeHex(hex, -36)); g.addColorStop(1, shadeHex(hex, 18));
     return g;
   }
-  var anim = { duration: 700, easing: "easeOutCubic", delay: function (ctx) { return ctx.type === "data" ? ctx.dataIndex * 40 : 0; } };
+  function hexAlpha(hex, a) {
+    var n = parseInt(String(hex).replace("#", ""), 16);
+    return "rgba(" + (n >> 16) + "," + ((n >> 8) & 255) + "," + (n & 255) + "," + a + ")";
+  }
+  function areaFill(chart, hex) {
+    var area = chart.chartArea;
+    if (!area) return hexAlpha(hex, 0.2);
+    var g = chart.ctx.createLinearGradient(0, area.top, 0, area.bottom);
+    g.addColorStop(0, hexAlpha(hex, 0.38));
+    g.addColorStop(1, hexAlpha(hex, 0));
+    return g;
+  }
+  function drawAnim(step) {
+    return { duration: 1400, easing: "easeOutQuart", delay: function (ctx) { return ctx.type === "data" ? ctx.dataIndex * step : 0; } };
+  }
   var tip = { backgroundColor: "rgba(10,14,20,.94)", borderColor: "rgba(186,206,230,.22)", borderWidth: 1, padding: 10, cornerRadius: 10, titleColor: "#f4f7fb", bodyColor: "#c5ced8", titleFont: { family: "Blinker", size: 12, weight: "600" }, bodyFont: { family: "Blinker", size: 12 } };
   var legend = { position: "bottom", labels: { color: "#c5ced8", boxWidth: 10, padding: 10, font: { size: 11, family: "Blinker" } } };
-  var scales = { x: { ticks: { color: "#8b97a6", font: { size: 11, family: "Blinker" } }, grid: { display: false } }, y: { ticks: { color: "#8b97a6", font: { size: 10 } }, grid: { color: "rgba(176,196,220,0.08)" }, border: { display: false } } };
+  var scales = { x: { ticks: { color: "#8b97a6", font: { size: 11, family: "Blinker" } }, grid: { display: false } }, y: { ticks: { color: "#8b97a6", font: { size: 10 } }, grid: { color: "rgba(176,196,220,0.08)" }, border: { display: false }, beginAtZero: true } };
+  var lineScales = { x: { ticks: { color: "#8b97a6", font: { size: 11, family: "Blinker" }, maxRotation: 0 }, grid: { display: false } }, y: { ticks: { color: "#8b97a6", font: { size: 10 }, callback: function (v) { return "$" + Number(v).toLocaleString(); } }, grid: { color: "rgba(176,196,220,0.08)" }, border: { display: false }, beginAtZero: true } };
+  var lineHover = { mode: "index", intersect: false };
   if (document.getElementById("pieChart")) {
     new Chart(document.getElementById("pieChart"), {
       type: "doughnut",
@@ -288,7 +305,7 @@ const CHART_BOOT = `
         ctx.fillText("$" + Math.round(DATA.totalMonth || 0).toLocaleString(), x, y - 2);
         ctx.fillStyle = "#8b97a6"; ctx.font = "600 10px Blinker, sans-serif"; ctx.fillText("PER MONTH", x, y + 14); ctx.restore();
       }}],
-      options: { cutout: "68%", animation: anim, plugins: { legend: legend, tooltip: Object.assign({}, tip, { callbacks: { label: function (c) { return " " + c.label + "  $" + Number(c.raw).toFixed(2); } } }) } }
+      options: { cutout: "68%", animation: { duration: 1300, easing: "easeOutQuart", animateRotate: true, animateScale: false }, plugins: { legend: legend, tooltip: Object.assign({}, tip, { callbacks: { label: function (c) { return " " + c.label + "  $" + Number(c.raw).toFixed(2); } } }) } }
     });
   }
   if (document.getElementById("barChart")) {
@@ -296,7 +313,7 @@ const CHART_BOOT = `
       type: "bar",
       data: { labels: DATA.barLabels, datasets: [{ data: DATA.barValues, borderRadius: 6, borderSkipped: false, barPercentage: 0.55, backgroundColor: function (c) { return verticalGradient(c.chart, DATA.barColors[c.dataIndex]); }, hoverBackgroundColor: (DATA.barColors || []).map(function (c) { return shadeHex(c, 28); }) }] },
       plugins: [valueLabels],
-      options: { animation: anim, maintainAspectRatio: false, layout: { padding: { top: 18, right: 4, bottom: 0, left: 0 } }, plugins: { legend: { display: false }, tooltip: Object.assign({}, tip, { callbacks: { label: function (c) { return " $" + Number(c.raw).toFixed(2); } } }) }, scales: scales }
+      options: { animation: drawAnim(120), maintainAspectRatio: false, layout: { padding: { top: 18, right: 4, bottom: 0, left: 0 } }, plugins: { legend: { display: false }, tooltip: Object.assign({}, tip, { callbacks: { label: function (c) { return " $" + Number(c.raw).toFixed(2); } } }) }, scales: scales }
     });
   }
   if (document.getElementById("catChart") && DATA.catLabels && DATA.catLabels.length) {
@@ -306,21 +323,36 @@ const CHART_BOOT = `
       type: "bar",
       data: { labels: DATA.catLabels, datasets: [{ data: DATA.catValues, borderRadius: 6, borderSkipped: false, barPercentage: 0.55, backgroundColor: function (c) { return horizontalGradient(c.chart, palette[c.dataIndex % palette.length]); }, hoverBackgroundColor: DATA.catLabels.map(function (_k, i) { return shadeHex(palette[i % palette.length], 26); }) }] },
       plugins: [barTrack, valueLabels],
-      options: { indexAxis: "y", animation: anim, maintainAspectRatio: false, layout: { padding: { right: 72 } }, plugins: { legend: { display: false }, tooltip: Object.assign({}, tip, { callbacks: { label: function (c) { return " $" + Number(c.raw).toFixed(2) + " / mo"; } } }) }, scales: { x: scales.x, y: { ticks: { color: "#c5ced8", font: { size: 12, family: "Blinker" } }, grid: { display: false } } } }
+      options: { indexAxis: "y", animation: drawAnim(80), maintainAspectRatio: false, layout: { padding: { right: 72 } }, plugins: { legend: { display: false }, tooltip: Object.assign({}, tip, { callbacks: { label: function (c) { return " $" + Number(c.raw).toFixed(2) + " / mo"; } } }) }, scales: { x: scales.x, y: { ticks: { color: "#c5ced8", font: { size: 12, family: "Blinker" } }, grid: { display: false } } } }
+    });
+  }
+  if (document.getElementById("lineChart") && DATA.outlook) {
+    var o = DATA.outlook;
+    var leftColor = o.leftover >= 0 ? "#3dcc6e" : "#ff6b63";
+    new Chart(document.getElementById("lineChart"), {
+      type: "line",
+      data: {
+        labels: o.labels,
+        datasets: [
+          { label: "Savings balance", data: o.savingsPath, borderColor: "#7eb0ff", backgroundColor: function (c) { return areaFill(c.chart, "#7eb0ff"); }, fill: true, tension: 0.35, borderWidth: 2.5, pointRadius: 0, pointHoverRadius: 5, pointBackgroundColor: "#7eb0ff", pointBorderColor: "#0e141c", pointBorderWidth: 2 },
+          { label: "Leftover, cumulative", data: o.leftoverPath, borderColor: leftColor, fill: false, tension: 0.35, borderWidth: 2.5, pointRadius: 0, pointHoverRadius: 5, pointBackgroundColor: leftColor, pointBorderColor: "#0e141c", pointBorderWidth: 2 },
+          { label: "Savings goal", data: o.goalPath, borderColor: "#e6c15a", borderDash: [5, 5], borderWidth: 1.5, pointRadius: 0, fill: false, tension: 0 }
+        ]
+      },
+      options: { animation: drawAnim(70), maintainAspectRatio: false, interaction: lineHover, plugins: { legend: legend, tooltip: Object.assign({}, tip, { callbacks: { label: function (c) { return " " + c.dataset.label + "  $" + Number(c.raw).toLocaleString(); } } }) }, scales: lineScales }
     });
   }
   if (document.getElementById("histChart") && DATA.history && DATA.history.length > 1) {
     new Chart(document.getElementById("histChart"), {
-      type: "bar",
+      type: "line",
       data: {
         labels: DATA.history.map(function (h) { return h.label; }),
         datasets: [
-          { label: "Income", data: DATA.history.map(function (h) { return h.income; }), borderRadius: 8, barPercentage: 0.7, backgroundColor: function (c) { return verticalGradient(c.chart, "#7eb0ff"); } },
-          { label: "Expenses", data: DATA.history.map(function (h) { return h.expenses; }), borderRadius: 8, barPercentage: 0.7, backgroundColor: function (c) { return verticalGradient(c.chart, "#ff6b63"); } }
+          { label: "Income", data: DATA.history.map(function (h) { return h.income; }), borderColor: "#7eb0ff", backgroundColor: function (c) { return areaFill(c.chart, "#7eb0ff"); }, fill: true, tension: 0.3, borderWidth: 2.5, pointRadius: 3, pointHoverRadius: 6, pointBackgroundColor: "#7eb0ff", pointBorderColor: "#0e141c", pointBorderWidth: 2 },
+          { label: "Expenses", data: DATA.history.map(function (h) { return h.expenses; }), borderColor: "#ff6b63", fill: false, tension: 0.3, borderWidth: 2.5, pointRadius: 3, pointHoverRadius: 6, pointBackgroundColor: "#ff6b63", pointBorderColor: "#0e141c", pointBorderWidth: 2 }
         ]
       },
-      plugins: [],
-      options: { animation: anim, maintainAspectRatio: false, layout: { padding: { top: 18 } }, plugins: { legend: legend, tooltip: tip }, scales: scales }
+      options: { animation: drawAnim(90), maintainAspectRatio: false, interaction: lineHover, plugins: { legend: legend, tooltip: tip }, scales: lineScales }
     });
   }
 })();
@@ -474,7 +506,27 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     barColors: ["#7eb0ff", "#ff6b63", "#3dcc6e", leftoverMonth >= 0 ? "#3dcc6e" : "#ff6b63"],
     catLabels: Object.entries(byCat).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([k]) => k),
     catValues: Object.entries(byCat).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([, v]) => Math.round(v * 100) / 100),
-    history: periodKeys.length > 1 ? history : []
+    history: periodKeys.length > 1 ? history : [],
+    outlook: (() => {
+      const names = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+      const startKey = periodKeys.length ? periodKeys[periodKeys.length - 1] : "";
+      const match = /^(\d{4})-(\d{2})/.exec(startKey);
+      let y = new Date().getFullYear();
+      let m = new Date().getMonth();
+      if (match) { y = Number(match[1]); m = Number(match[2]) - 1; }
+      const labels: string[] = [];
+      const savingsPath: number[] = [];
+      const leftoverPath: number[] = [];
+      const goalPath: number[] = [];
+      for (let i = 0; i < 13; i++) {
+        const d = new Date(y, m + i, 1);
+        labels.push(names[d.getMonth()] + " " + String(d.getFullYear()).slice(2));
+        savingsPath.push(Math.round((balance + savings * i) * 100) / 100);
+        leftoverPath.push(Math.round(leftoverMonth * i * 100) / 100);
+        goalPath.push(Math.round(goal * 100) / 100);
+      }
+      return { labels, savingsPath, leftoverPath, goalPath, leftover: leftoverMonth };
+    })()
   }).replace(/</g, "\\u003c");
 
   const rows = expenses.map((e: any) => {
@@ -510,7 +562,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       </div>
     </div></div>` : "";
 
-  const histCard = history.length > 1 ? `<div class="chart-card wide"><h3>Period history</h3><div class="chart-stage bars tall"><canvas id="histChart"></canvas></div></div>` : "";
+  const histCard = history.length > 1 ? `<div class="chart-card wide"><h3>Period trend</h3><div class="chart-stage bars line"><canvas id="histChart"></canvas></div></div>` : "";
   const superHtml = superTotal > 0 ? `<div class="super-note"><span>+${money(Math.round(superTotal)).replace(/\.00$/, "")} super</span><span>${money(Math.round(gross + superTotal)).replace(/\.00$/, "")} total</span></div>` : "";
 
   return new Response(`<!DOCTYPE html>
@@ -543,6 +595,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 <div class="section"><h3>Charts</h3><div class="pad"><div class="charts">
   <div class="chart-card"><h3>Expense mix</h3><div class="chart-stage"><canvas id="pieChart"></canvas></div></div>
   <div class="chart-card"><h3>Monthly allocation</h3><div class="chart-stage bars"><canvas id="barChart"></canvas></div></div>
+  <div class="chart-card wide"><h3>12-month outlook</h3><div class="chart-stage bars line"><canvas id="lineChart"></canvas></div></div>
   <div class="chart-card wide"><h3>Spend by category</h3><div class="chart-stage bars tall"><canvas id="catChart"></canvas></div></div>
   ${histCard}
 </div></div></div>

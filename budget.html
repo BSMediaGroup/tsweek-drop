@@ -535,6 +535,7 @@
     justify-content: center;
   }
   .chart-stage.bars { display: block; }
+  .chart-stage.line { height: 280px; }
   .chart-stage canvas,
   .chart-stage.bars canvas,
   .chart-card:hover canvas,
@@ -746,6 +747,14 @@
         <div class="chart-card">
           <h3>Monthly allocation</h3>
           <div class="chart-stage bars"><canvas id="barChart"></canvas></div>
+        </div>
+        <div class="chart-card wide">
+          <h3>12-month outlook</h3>
+          <div class="chart-stage bars line"><canvas id="lineChart"></canvas></div>
+        </div>
+        <div class="chart-card wide" id="trendCard" style="display:none">
+          <h3>Period trend</h3>
+          <div class="chart-stage bars line"><canvas id="trendChart"></canvas></div>
         </div>
         <div class="chart-card wide">
           <h3>Spend by category</h3>
@@ -986,6 +995,8 @@ let saveTimer = null;
 let pieChart = null;
 let barChart = null;
 let catChart = null;
+let lineChart = null;
+let trendChart = null;
 let lastChartSig = "";
 
 const DEFAULT_EXPENSES = [
@@ -1542,7 +1553,7 @@ const valueLabels = {
       const raw = Number(chart.data.datasets[0].data[i]);
       if (!isFinite(raw)) return;
       const label = "$" + Math.round(raw).toLocaleString();
-      const p = el.getProps(["x", "y", "base"], true);
+      const p = el.getProps(["x", "y", "base"], false);
       if (horizontal) {
         ctx.textAlign = "left";
         ctx.textBaseline = "middle";
@@ -1607,6 +1618,32 @@ const chartTip = {
   boxPadding: 4
 };
 
+function hexAlpha(hex, a) {
+  const n = parseInt(String(hex).replace("#", ""), 16);
+  return "rgba(" + (n >> 16) + "," + ((n >> 8) & 255) + "," + (n & 255) + "," + a + ")";
+}
+function areaFill(chart, hex) {
+  const area = chart.chartArea;
+  if (!area) return hexAlpha(hex, 0.2);
+  const g = chart.ctx.createLinearGradient(0, area.top, 0, area.bottom);
+  g.addColorStop(0, hexAlpha(hex, 0.38));
+  g.addColorStop(1, hexAlpha(hex, 0));
+  return g;
+}
+function drawAnim(step) {
+  return { duration: 1400, easing: "easeOutQuart", delay: (ctx) => ctx.type === "data" ? ctx.dataIndex * step : 0 };
+}
+function putChart(existing, id, config) {
+  const node = document.getElementById(id);
+  if (!node) return existing;
+  if (!existing) return new Chart(node, config);
+  existing.data.labels = config.data.labels;
+  existing.data.datasets = config.data.datasets;
+  existing.options.animation = config.options.animation;
+  existing.update();
+  return existing;
+}
+
 function updateCharts(expenses, income, savings, leftover) {
   const byFreq = {};
   FREQS.forEach(f => byFreq[f] = 0);
@@ -1626,21 +1663,51 @@ function updateCharts(expenses, income, savings, leftover) {
   const barValues = [income, expMonth, savings, leftover];
   const barColors = ["#7eb0ff", "#ff6b63", "#3dcc6e", leftover >= 0 ? "#3dcc6e" : "#ff6b63"];
   const catEntries = Object.entries(byCat).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]).slice(0, 8);
-  const sig = JSON.stringify([pieValues.map(v => +v.toFixed(2)), barValues.map(v => +v.toFixed(2)), catEntries.map(([k, v]) => [k, +v.toFixed(2)])]);
-  const animate = sig !== lastChartSig;
+  const goal = parseFloat(document.getElementById("savingsGoal").value) || 0;
+  const balance = parseFloat(document.getElementById("savingsBalance").value) || 0;
+  const names = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  let startY = new Date().getFullYear(), startM = new Date().getMonth();
+  const keyMatch = /^(\d{4})-(\d{2})/.exec(currentPeriodKey || "");
+  if (keyMatch) { startY = +keyMatch[1]; startM = +keyMatch[2] - 1; }
+  const lineLabels = [], savPath = [], leftPath = [], goalPath = [];
+  for (let i = 0; i < 13; i++) {
+    const d = new Date(startY, startM + i, 1);
+    lineLabels.push(names[d.getMonth()] + " " + String(d.getFullYear()).slice(2));
+    savPath.push(Math.round((balance + savings * i) * 100) / 100);
+    leftPath.push(Math.round(leftover * i * 100) / 100);
+    goalPath.push(Math.round(goal * 100) / 100);
+  }
+  const trend = Object.keys(periods).sort().map(key => {
+    const p = periods[key] || {};
+    const inc = (Number(p.income) || 0) + (Number(p.phoneAllowance) || 0);
+    let expDaily = 0;
+    (p.expenses || []).forEach(e => { expDaily += toDaily(Number(e.amount) || 0, e.frequency); });
+    const expM = project(expDaily, "month");
+    const sav = Number(p.savings) || 0;
+    return { label: key, income: Math.round(inc), expenses: Math.round(expM), leftover: Math.round(inc - expM - sav) };
+  });
+  const trendCard = document.getElementById("trendCard");
+  if (trendCard) trendCard.style.display = trend.length > 1 ? "" : "none";
+  const sig = JSON.stringify([
+    pieValues.map(v => +v.toFixed(2)),
+    barValues.map(v => +v.toFixed(2)),
+    catEntries.map(([k, v]) => [k, +v.toFixed(2)]),
+    savPath, leftPath, goalPath,
+    trend
+  ]);
+  if (sig === lastChartSig && pieChart) return;
   lastChartSig = sig;
-  const anim = animate ? { duration: 700, easing: "easeOutCubic", delay: (ctx) => ctx.type === "data" ? ctx.dataIndex * 40 : 0 } : false;
   const legend = { position: "bottom", labels: { color: "#c5ced8", boxWidth: 10, padding: 10, font: { size: 11, family: "Blinker" } } };
-  const totalMonth = pieValues.reduce((s, v) => s + v, 0);
-
-  if (pieChart) pieChart.destroy();
-  if (barChart) barChart.destroy();
-  if (catChart) catChart.destroy();
+  const lineScales = {
+    x: { ticks: { color: "#8b97a6", font: { size: 11, family: "Blinker" }, maxRotation: 0 }, grid: { display: false } },
+    y: { ticks: { color: "#8b97a6", font: { size: 10 }, callback: (v) => "$" + Number(v).toLocaleString() }, grid: { color: "rgba(176,196,220,0.08)" }, border: { display: false }, beginAtZero: true }
+  };
+  const lineHover = { mode: "index", intersect: false };
 
   const catStage = document.getElementById("catChart").parentElement;
   if (catStage) catStage.style.height = Math.max(160, catEntries.length * 38 + 28) + "px";
 
-  pieChart = new Chart(document.getElementById("pieChart"), {
+  pieChart = putChart(pieChart, "pieChart", {
     type: "doughnut",
     data: { labels: pieLabels, datasets: [{ data: pieValues, backgroundColor: palette, hoverBackgroundColor: palette.map(c => shadeHex(c, 22)), borderColor: "#121820", borderWidth: 2, spacing: 2, borderRadius: 4, hoverOffset: 6 }] },
     plugins: [{
@@ -1649,12 +1716,13 @@ function updateCharts(expenses, income, savings, leftover) {
         const meta = chart.getDatasetMeta(0);
         if (!meta.data[0]) return;
         const { x, y } = meta.data[0];
+        const total = (chart.data.datasets[0].data || []).reduce((s, v) => s + Number(v), 0);
         const ctx = chart.ctx;
         ctx.save();
         ctx.textAlign = "center";
         ctx.fillStyle = "#f4f7fb";
         ctx.font = "700 16px 'Source Sans 3', sans-serif";
-        ctx.fillText("$" + Math.round(totalMonth).toLocaleString(), x, y - 2);
+        ctx.fillText("$" + Math.round(total).toLocaleString(), x, y - 2);
         ctx.fillStyle = "#8b97a6";
         ctx.font = "600 10px Blinker, sans-serif";
         ctx.fillText("PER MONTH", x, y + 14);
@@ -1663,12 +1731,12 @@ function updateCharts(expenses, income, savings, leftover) {
     }],
     options: {
       cutout: "68%",
-      animation: anim,
+      animation: { duration: 1300, easing: "easeOutQuart", animateRotate: true, animateScale: false },
       plugins: { legend, tooltip: Object.assign({}, chartTip, { callbacks: { label: (c) => " " + c.label + "  $" + Number(c.raw).toFixed(2) } }) }
     }
   });
 
-  barChart = new Chart(document.getElementById("barChart"), {
+  barChart = putChart(barChart, "barChart", {
     type: "bar",
     data: {
       labels: barLabels,
@@ -1683,18 +1751,59 @@ function updateCharts(expenses, income, savings, leftover) {
     },
     plugins: [valueLabels],
     options: {
-      animation: anim,
+      animation: drawAnim(120),
       maintainAspectRatio: false,
       layout: { padding: { top: 18, right: 4, bottom: 0, left: 0 } },
       plugins: { legend: { display: false }, tooltip: Object.assign({}, chartTip, { callbacks: { label: (c) => " $" + Number(c.raw).toFixed(2) } }) },
       scales: {
         x: { ticks: { color: "#8b97a6", font: { size: 11, family: "Blinker" } }, grid: { display: false } },
-        y: { ticks: { color: "#8b97a6", font: { size: 10 } }, grid: { color: "rgba(176,196,220,0.08)" }, border: { display: false } }
+        y: { ticks: { color: "#8b97a6", font: { size: 10 } }, grid: { color: "rgba(176,196,220,0.08)" }, border: { display: false }, beginAtZero: true }
       }
     }
   });
 
-  catChart = new Chart(document.getElementById("catChart"), {
+  const leftColor = leftover >= 0 ? "#3dcc6e" : "#ff6b63";
+  lineChart = putChart(lineChart, "lineChart", {
+    type: "line",
+    data: {
+      labels: lineLabels,
+      datasets: [
+        { label: "Savings balance", data: savPath, borderColor: "#7eb0ff", backgroundColor: (c) => areaFill(c.chart, "#7eb0ff"), fill: true, tension: 0.35, borderWidth: 2.5, pointRadius: 0, pointHoverRadius: 5, pointBackgroundColor: "#7eb0ff", pointBorderColor: "#0e141c", pointBorderWidth: 2 },
+        { label: "Leftover, cumulative", data: leftPath, borderColor: leftColor, backgroundColor: leftColor, fill: false, tension: 0.35, borderWidth: 2.5, pointRadius: 0, pointHoverRadius: 5, pointBackgroundColor: leftColor, pointBorderColor: "#0e141c", pointBorderWidth: 2 },
+        { label: "Savings goal", data: goalPath, borderColor: "#e6c15a", borderDash: [5, 5], borderWidth: 1.5, pointRadius: 0, fill: false, tension: 0 }
+      ]
+    },
+    options: {
+      animation: drawAnim(70),
+      maintainAspectRatio: false,
+      interaction: lineHover,
+      plugins: { legend, tooltip: Object.assign({}, chartTip, { callbacks: { label: (c) => " " + c.dataset.label + "  $" + Number(c.raw).toLocaleString() } }) },
+      scales: lineScales
+    }
+  });
+
+  if (trend.length > 1) {
+    trendChart = putChart(trendChart, "trendChart", {
+      type: "line",
+      data: {
+        labels: trend.map(t => t.label),
+        datasets: [
+          { label: "Income", data: trend.map(t => t.income), borderColor: "#7eb0ff", backgroundColor: (c) => areaFill(c.chart, "#7eb0ff"), fill: true, tension: 0.3, borderWidth: 2.5, pointRadius: 3, pointHoverRadius: 6, pointBackgroundColor: "#7eb0ff", pointBorderColor: "#0e141c", pointBorderWidth: 2 },
+          { label: "Expenses", data: trend.map(t => t.expenses), borderColor: "#ff6b63", fill: false, tension: 0.3, borderWidth: 2.5, pointRadius: 3, pointHoverRadius: 6, pointBackgroundColor: "#ff6b63", pointBorderColor: "#0e141c", pointBorderWidth: 2 },
+          { label: "Leftover", data: trend.map(t => t.leftover), borderColor: "#3dcc6e", fill: false, tension: 0.3, borderWidth: 2.5, pointRadius: 3, pointHoverRadius: 6, pointBackgroundColor: "#3dcc6e", pointBorderColor: "#0e141c", pointBorderWidth: 2 }
+        ]
+      },
+      options: {
+        animation: drawAnim(90),
+        maintainAspectRatio: false,
+        interaction: lineHover,
+        plugins: { legend, tooltip: Object.assign({}, chartTip, { callbacks: { label: (c) => " " + c.dataset.label + "  $" + Number(c.raw).toLocaleString() } }) },
+        scales: lineScales
+      }
+    });
+  }
+
+  catChart = putChart(catChart, "catChart", {
     type: "bar",
     data: {
       labels: catEntries.map(([k]) => k),
@@ -1709,12 +1818,12 @@ function updateCharts(expenses, income, savings, leftover) {
     },
     options: {
       indexAxis: "y",
-      animation: anim,
+      animation: drawAnim(80),
       maintainAspectRatio: false,
       layout: { padding: { top: 4, right: 72, bottom: 0, left: 0 } },
       plugins: { legend: { display: false }, tooltip: Object.assign({}, chartTip, { callbacks: { label: (c) => " $" + Number(c.raw).toFixed(2) + " / mo" } }) },
       scales: {
-        x: { ticks: { color: "#8b97a6", font: { size: 10 } }, grid: { color: "rgba(176,196,220,0.08)" }, border: { display: false } },
+        x: { ticks: { color: "#8b97a6", font: { size: 10 } }, grid: { color: "rgba(176,196,220,0.08)" }, border: { display: false }, beginAtZero: true },
         y: { ticks: { color: "#c5ced8", font: { size: 12, family: "Blinker" } }, grid: { display: false } }
       }
     },
